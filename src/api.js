@@ -1,3 +1,4 @@
+
 /**
  * Frontend API client for ElectroHub SaaS.
  * Uses HTTP-only session cookies and in-memory auth header fallback.
@@ -6,25 +7,46 @@
 
 let inMemoryToken = null;
 
+// API base URL from Vite environment variables.
+// Production: https://electoniki-b.onrender.com/api
+// Development fallback: /api
+const API_BASE_URL = (
+  import.meta.env.VITE_API_URL || '/api'
+).replace(/\/+$/, '');
+
 export function setSessionToken(token) {
   inMemoryToken = token || null;
 }
 
-export async function apiRequest(path, { method = 'GET', body, signal } = {}) {
-  const headers = { 'Content-Type': 'application/json' };
+export async function apiRequest(
+  path,
+  { method = 'GET', body, signal } = {}
+) {
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+
   if (inMemoryToken) {
     headers.Authorization = `Bearer ${inMemoryToken}`;
   }
 
-  const res = await fetch(`/api${path}`, {
+  // Normalize the API path to avoid missing or duplicate slashes.
+  const normalizedPath = path.startsWith('/')
+    ? path
+    : `/${path}`;
+
+  const requestUrl = `${API_BASE_URL}${normalizedPath}`;
+
+  const res = await fetch(requestUrl, {
     method,
     headers,
-    credentials: 'same-origin',
+    credentials: 'include',
     signal,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 
   let data = null;
+
   try {
     data = await res.json();
   } catch {
@@ -32,9 +54,13 @@ export async function apiRequest(path, { method = 'GET', body, signal } = {}) {
   }
 
   if (!res.ok) {
-    const err = new Error(data?.error || `Request failed (${res.status})`);
+    const err = new Error(
+      data?.error || `Request failed (${res.status})`
+    );
+
     err.status = res.status;
     err.data = data;
+
     throw err;
   }
 
