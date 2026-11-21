@@ -16,7 +16,7 @@ import {
 import { apiRequest, money, num } from '../../api.js';
 
 export default function StockProductsPage({ app }) {
-  const { optionalWarrantyValue, data, page, setPage, inventorySearch, setInventorySearch, inventoryChip, setInventoryChip, stockTab, setStockTab, setEditingProduct, setShowProductModal, showAlert } = app;
+  const { optionalWarrantyValue, data, page, setPage, inventorySearch, setInventorySearch, inventoryChip, setInventoryChip, stockTab, setStockTab, setEditingProduct, setShowProductModal, showAlert, refreshWorkspace, notify } = app;
   async function downloadInvoice(receipt) {
     try {
       const document = await apiRequest(`/stock-receipts/${encodeURIComponent(receipt.id)}/document`);
@@ -229,6 +229,7 @@ export default function StockProductsPage({ app }) {
                                     <tr key={p.id}>
                                       <td>
                                         <strong>{p.name}</strong>
+                                          {p.active === false && <span className="status overdue" style={{ marginLeft: 8 }}>Inactive</span>}
                                         <small className="muted" style={{ display: 'block' }}>
                                           SKU: {p.code}
                                           {p.serialNumber ? ` · SN: ${p.serialNumber}` : ''}
@@ -272,6 +273,13 @@ export default function StockProductsPage({ app }) {
                                         >
                                           Edit / Adjust
                                         </button>
+                                        <button type="button" className="btn ghost small" onClick={() => showAlert(p.active === false ? 'Reactivate product?' : 'Deactivate product?', `${p.name} ${p.active === false ? 'will be available for new sales again.' : 'will be hidden from new sales while its history and stock record are preserved.'}`, p.active === false ? 'warning' : 'danger', p.active === false ? 'Reactivate' : 'Deactivate', async () => {
+                                          try {
+                                            await apiRequest(`/products/${encodeURIComponent(p.id)}`, { method: 'PUT', body: { active: p.active === false } });
+                                            await refreshWorkspace();
+                                            notify(p.active === false ? 'Product reactivated.' : 'Product deactivated; history preserved.');
+                                          } catch (error) { showAlert('Could not update product', error.message, 'warning'); }
+                                        })}>{p.active === false ? 'Reactivate' : 'Deactivate'}</button>
                                       </td>
                                     </tr>
                                   );

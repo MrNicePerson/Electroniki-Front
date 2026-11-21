@@ -12,6 +12,8 @@
 .ci-invoice-kind { font-size:7.3pt; overflow-wrap:anywhere; padding-inline:1mm; }
 .ci-continuation { margin-top:2mm; padding:2mm; border:1px dashed var(--ci-line); color:#536b7a; font-size:7.5pt; text-align:right; }
 .ci-installment-bottom .ci-summary-row { min-height:6.2mm; font-size:7.2pt; }
+.ci-sales-bottom{grid-template-columns:1fr}.ci-sales-right-stack:empty{display:none}.ci-sales-bottom .ci-summary-row{min-height:7mm;padding:0.7mm 2.5mm}.ci-sales-bottom .ci-summary h3{padding:1.2mm 2.5mm}
+.ci-customer.is-installment{height:29mm;grid-template-rows:repeat(5,minmax(0,1fr))}.ci-installment .ci-plan>div{white-space:normal;flex-direction:column;gap:.8mm}.ci-installment .ci-plan>div small{font-size:6.5pt;font-weight:650}
 
 /* Climax A5 invoice reference styling */
 .ci-page{border:1px solid #1672c8;padding:4.5mm 4.5mm 4mm;font-family:"Arial Narrow",Arial,sans-serif;color:#101820}

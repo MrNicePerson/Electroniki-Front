@@ -59,6 +59,9 @@ export default function CashRegisterPage({ data, onRefresh, notify, showAlert })
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [installmentReviewConfirmed, setInstallmentReviewConfirmed] = useState(false);
+  const [reconcileSession, setReconcileSession] = useState(null);
+  const [reconcileAmount, setReconcileAmount] = useState('');
+  const [reconcileNote, setReconcileNote] = useState('');
 
   async function loadRegister() {
     setLoading(true);
@@ -106,6 +109,22 @@ export default function CashRegisterPage({ data, onRefresh, notify, showAlert })
     } finally {
       setSaving(false);
     }
+  }
+
+  async function submitReconciliation(event) {
+    event.preventDefault();
+    if (!reconcileSession || reconcileAmount === '' || !Number.isFinite(Number(reconcileAmount)) || Number(reconcileAmount) < 0) return;
+    setSaving(true);
+    try {
+      await apiRequest(`/cash-register/${encodeURIComponent(reconcileSession.id)}/reconcile`, {
+        method: 'PATCH', body: { actualClosingAmount: Number(reconcileAmount), note: reconcileNote },
+      });
+      setReconcileSession(null); setReconcileAmount(''); setReconcileNote('');
+      notify('Cash session reconciled.');
+      await loadRegister();
+    } catch (error) {
+      showAlert('Could not reconcile cash session', error.message, 'warning');
+    } finally { setSaving(false); }
   }
 
   const expected = Number(current?.expectedClosingAmount || 0);
@@ -318,13 +337,20 @@ export default function CashRegisterPage({ data, onRefresh, notify, showAlert })
                   <td>{money(expectedAmount)}</td>
                   <td>{isOpen ? '-' : autoClosed ? 'Not counted' : money(session.actualClosingAmount)}</td>
                   <td className={isOpen ? '' : autoClosed || Number(expectedAmount) < 0 ? 'cash-register-table-review' : difference < 0 ? 'cash-register-table-short' : difference > 0 ? 'cash-register-table-excess' : 'cash-register-table-matched'}>{isOpen ? '-' : autoClosed ? 'Not reconciled' : Number(expectedAmount) < 0 ? `Ledger below zero ${money(Math.abs(Number(expectedAmount)))}` : `${difference > 0 ? '+' : ''}${money(difference)}`}</td>
-                  <td><span className={`cash-register-history-status ${isOpen ? 'open' : autoClosed || Number(expectedAmount) < 0 ? 'review' : 'closed'}`}>{isOpen ? 'Open' : autoClosed ? 'Auto closed' : Number(expectedAmount) < 0 ? 'Needs review' : 'Closed'}</span></td>
+                  <td><span className={`cash-register-history-status ${isOpen ? 'open' : autoClosed || Number(expectedAmount) < 0 ? 'review' : 'closed'}`}>{isOpen ? 'Open' : autoClosed ? 'Auto closed' : Number(expectedAmount) < 0 ? 'Needs review' : 'Closed'}</span>{autoClosed && <button type="button" className="btn ghost small" onClick={() => { setReconcileSession(session); setReconcileAmount(''); setReconcileNote(''); }}>Reconcile</button>}</td>
                 </tr>
               );
             })}</tbody>
           </table></div>
         ) : <div className="cash-register-empty-history">No cash sessions yet. Open the register to start tracking a day.</div>}
       </section>
+      {reconcileSession && <div className="modal-backdrop" onClick={(event) => event.target === event.currentTarget && setReconcileSession(null)}>
+        <form className="modal" role="dialog" aria-modal="true" onSubmit={submitReconciliation}>
+          <div className="modal-head"><div><h2>Reconcile missed closing</h2><p>Session opened {timeLabel(reconcileSession.openedAt)}. Enter the physical cash count if you have it.</p></div><button type="button" className="icon-btn" onClick={() => setReconcileSession(null)}>×</button></div>
+          <div className="modal-body"><div className="fields"><label className="field">Actual cash counted (Rs.)<NumericInput required type="text" min="0" value={reconcileAmount} onChange={(event) => setReconcileAmount(event.target.value)} placeholder="Enter drawer count" /></label><label className="field full">Closing note<input value={reconcileNote} onChange={(event) => setReconcileNote(event.target.value)} placeholder="Optional note about the missed close" /></label></div></div>
+          <div className="modal-actions"><button type="button" className="btn ghost" onClick={() => setReconcileSession(null)}>Cancel</button><button type="submit" className="btn" disabled={saving || reconcileAmount === ''}>{saving ? 'Saving…' : 'Save reconciliation'}</button></div>
+        </form>
+      </div>}
     </div>
   );
 }

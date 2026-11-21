@@ -407,6 +407,8 @@ export default function NewSalePage({ app }) {
                           min="0"
                           value={billDiscount}
                           onChange={(e) => setBillDiscount(num(e.target.value))}
+                          placeholder="Enter discount amount"
+                          aria-label="Discount amount in rupees"
                         />
                       </div>
                     </div>

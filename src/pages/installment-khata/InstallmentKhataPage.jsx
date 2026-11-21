@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ChevronDown, Search, UserRound, UsersRound } from 'lucide-react';
-import { money, num } from '../../api.js';
+import { apiRequest, money, num } from '../../api.js';
 
 function normalizedPhone(value) {
   const digits = String(value || '').replace(/\D/g, '');
@@ -42,6 +42,8 @@ function groupPlansByCustomer(plans = []) {
 
 export default function InstallmentKhataPage({ app }) {
   const [expandedAccounts, setExpandedAccounts] = useState(() => new Set());
+  const [editingPlan, setEditingPlan] = useState(null);
+  const [savingPlan, setSavingPlan] = useState(false);
   const {
     data,
     khataSearch,
@@ -50,6 +52,9 @@ export default function InstallmentKhataPage({ app }) {
     setActiveKhataPlan,
     setKhataPayAmount,
     dateText,
+    refreshWorkspace,
+    showAlert,
+    notify,
   } = app;
   const accounts = groupPlansByCustomer(data.installmentPlans);
   const query = khataSearch.trim().toLowerCase();
@@ -68,6 +73,67 @@ export default function InstallmentKhataPage({ app }) {
       });
     })
   );
+
+  function beginEdit(plan) {
+    const details = plan.installmentDetails || {};
+    const customer = details.customer || {};
+    const guarantor = details.guarantor || {};
+    const schedule = details.plan || {};
+    setEditingPlan({
+      id: plan.id,
+      planNo: plan.planNo || plan.invoiceNo,
+      customerName: customer.name || plan.customerName || '',
+      phone: customer.phone || plan.phone || '',
+      whatsapp: customer.whatsapp || plan.whatsapp || '',
+      cnic: customer.cnic || plan.cnic || '',
+      address: customer.address || plan.address || '',
+      guarantor: guarantor.name || plan.guarantor || '',
+      guarantorPhone: guarantor.phone || plan.guarantorPhone || '',
+      guarantorCnic: guarantor.cnic || plan.guarantorCnic || '',
+      guarantorAddress: guarantor.address || plan.guarantorAddress || '',
+      months: schedule.months || plan.months || 12,
+      monthlyAmount: schedule.monthlyAmount ?? plan.monthlyAmount ?? 0,
+      startDate: schedule.startDate || plan.startDate || '',
+      nextDueDate: schedule.nextDueDate || plan.nextDueDate || '',
+    });
+  }
+
+  async function savePlanEdit(event) {
+    event.preventDefault();
+    if (!editingPlan) return;
+    setSavingPlan(true);
+    try {
+      await apiRequest(`/installments/${encodeURIComponent(editingPlan.id)}`, {
+        method: 'PUT',
+        body: JSON.stringify(editingPlan),
+      });
+      await refreshWorkspace();
+      setEditingPlan(null);
+      notify('Installment plan updated.');
+    } catch (error) {
+      showAlert('Could not update installment plan', error.message, 'warning');
+    } finally {
+      setSavingPlan(false);
+    }
+  }
+
+  function deletePlan(plan) {
+    showAlert(
+      'Delete installment plan?',
+      `${plan.planNo || plan.invoiceNo} can be deleted only if no payment, advance, or product sale is linked to it.`,
+      'danger',
+      'Delete plan',
+      async () => {
+        try {
+          await apiRequest(`/installments/${encodeURIComponent(plan.id)}`, { method: 'DELETE' });
+          await refreshWorkspace();
+          notify('Installment plan deleted.');
+        } catch (error) {
+          showAlert('Could not delete installment plan', error.message, 'warning');
+        }
+      },
+    );
+  }
 
   return (
     <>
@@ -188,7 +254,7 @@ export default function InstallmentKhataPage({ app }) {
                       <div className="khata-customer-plan" key={item.id}>
                         <div className="khata-customer-plan-info">
                           <b>{item.planNo || item.invoiceNo}</b>
-                          <small>{item.productSummary || `${item.months || 0} month plan`}</small>
+                          <small>{item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-GB', { timeZone: 'Asia/Karachi', day: '2-digit', month: 'short', year: 'numeric' }) : 'Date not recorded'} · {item.productSummary || `${item.months || 0} month plan`}</small>
                         </div>
                         <div className="khata-customer-plan-balance">
                           <small>{num(item.balance) > 0 ? 'Balance' : 'Paid'}</small>
@@ -206,6 +272,8 @@ export default function InstallmentKhataPage({ app }) {
                         >
                           {num(item.balance) > 0 ? 'View & Pay' : 'View Details'}
                         </button>
+                        <button type="button" className="btn ghost small" onClick={() => beginEdit(item)}>Edit</button>
+                        <button type="button" className="btn danger small" onClick={() => deletePlan(item)}>Delete</button>
                       </div>
                     ))}
                   </div>
@@ -224,6 +292,29 @@ export default function InstallmentKhataPage({ app }) {
           </div>
         )}
       </section>
+
+      {editingPlan && <div className="modal-backdrop" onClick={(event) => event.target === event.currentTarget && setEditingPlan(null)}>
+        <form className="modal" role="dialog" aria-modal="true" onSubmit={savePlanEdit}>
+          <div className="modal-head"><div><h2>Edit installment plan</h2><p>{editingPlan.planNo}</p></div><button type="button" className="btn ghost small" onClick={() => setEditingPlan(null)}>Close</button></div>
+          <div className="modal-body">
+            <div className="modal-section">CUSTOMER DETAILS</div>
+            <div className="form-grid">
+              {[
+                ['Customer name', 'customerName'], ['Phone', 'phone'], ['WhatsApp', 'whatsapp'], ['CNIC', 'cnic'], ['Address', 'address'],
+                ['Guarantor name', 'guarantor'], ['Guarantor phone', 'guarantorPhone'], ['Guarantor CNIC', 'guarantorCnic'], ['Guarantor address', 'guarantorAddress'],
+              ].map(([label, field]) => <label className="field" key={field}><span>{label}</span><input value={editingPlan[field]} onChange={(event) => setEditingPlan((current) => ({ ...current, [field]: event.target.value }))} /></label>)}
+            </div>
+            <div className="modal-section" style={{ marginTop: 18 }}>PAYMENT SCHEDULE</div>
+            <div className="form-grid">
+              <label className="field"><span>Months</span><input type="number" min="1" max="60" required value={editingPlan.months} onChange={(event) => setEditingPlan((current) => ({ ...current, months: event.target.value }))} /></label>
+              <label className="field"><span>Monthly amount</span><input type="number" min="0" step="1" required value={editingPlan.monthlyAmount} onChange={(event) => setEditingPlan((current) => ({ ...current, monthlyAmount: event.target.value }))} /></label>
+              <label className="field"><span>Start date</span><input type="date" value={editingPlan.startDate} onChange={(event) => setEditingPlan((current) => ({ ...current, startDate: event.target.value }))} /></label>
+              <label className="field"><span>Next due date</span><input type="date" value={editingPlan.nextDueDate} onChange={(event) => setEditingPlan((current) => ({ ...current, nextDueDate: event.target.value }))} /></label>
+            </div>
+          </div>
+          <div className="modal-actions"><button type="button" className="btn ghost" onClick={() => setEditingPlan(null)}>Cancel</button><button type="submit" className="btn" disabled={savingPlan}>{savingPlan ? 'Saving…' : 'Save changes'}</button></div>
+        </form>
+      </div>}
     </>
   );
 }

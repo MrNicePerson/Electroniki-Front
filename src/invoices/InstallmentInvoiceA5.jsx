@@ -34,7 +34,7 @@ export default function InstallmentInvoiceA5({ invoice }) {
           <div className="ci-bottom ci-installment-bottom">
             <SummaryTable rows={rows} />
             <div className="ci-right-stack">
-              <section className="ci-plan"><h3><CalendarDays />INSTALLMENT PLAN</h3><div>{plan}</div></section>
+              <section className="ci-plan"><h3><CalendarDays />INSTALLMENT PLAN</h3><div>{plan}<small>{invoice.startDate ? `Start: ${invoice.startDate}` : ''}{invoice.nextDueDate ? ` · Next due: ${invoice.nextDueDate}` : ''}</small></div></section>
               <Terms terms={invoice.terms} />
             </div>
           </div>

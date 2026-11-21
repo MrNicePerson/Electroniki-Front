@@ -7,6 +7,7 @@ export default function CustomersView({
   installmentPlans = [],
   onOpenNewCustomer,
   onEditCustomer,
+  onDeleteCustomer,
 }) {
   const [search, setSearch] = useState('');
   const [selectedLedgerCustomer, setSelectedLedgerCustomer] = useState(null);
@@ -111,6 +112,7 @@ export default function CustomersView({
                           >
                             Edit
                           </button>
+                          <button type="button" className="btn danger small" onClick={() => onDeleteCustomer(c)}>Delete</button>
                         </div>
                       </td>
                     </tr>
@@ -161,6 +163,7 @@ export default function CustomersView({
                       <thead>
                         <tr>
                           <th>Invoice</th>
+                          <th>Date</th>
                           <th>Type</th>
                           <th>Total</th>
                           <th>Paid</th>
@@ -173,6 +176,7 @@ export default function CustomersView({
                             <td>
                               <strong>{b.invoiceNo}</strong>
                             </td>
+                            <td>{b.createdAt ? new Date(b.createdAt).toLocaleDateString('en-GB', { timeZone: 'Asia/Karachi', day: '2-digit', month: 'short', year: 'numeric' }) : '-'}</td>
                             <td>{b.type === 'installment' ? 'Installment' : 'Cash'}</td>
                             <td>{money(b.total)}</td>
                             <td>{money(b.paid)}</td>

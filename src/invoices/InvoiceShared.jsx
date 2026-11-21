@@ -35,15 +35,19 @@ export function InvoiceHeader({ title, shop = {} }) {
 }
 
 export function CustomerBlock({ data }) {
+  const installment = data.type === 'installment';
   return (
-    <section className="ci-customer">
+    <section className={`ci-customer${installment ? ' is-installment' : ''}`}>
       <div className="ci-customer-row">
-        <b>Invoice No.</b><strong className="ci-invoice-number">{data.invoiceNo}{data.padNo && <small>Pad {data.padNo}</small>}</strong>
+        <b>Invoice No.</b><strong className="ci-invoice-number">{data.invoiceNo}{data.padNo && <small>Paid No. {data.padNo}</small>}</strong>
         <b className="ci-date-label">Date</b><strong className="ci-date-value"><CalendarDays />{data.date}</strong>
       </div>
       <div className="ci-customer-row"><b>Customer Name</b><strong className="ci-customer-value">{data.customerName}</strong></div>
       <div className="ci-customer-row"><b>Address</b><strong className="ci-customer-value">{data.customerAddress}</strong></div>
-      {data.guarantorCnic && <div className="ci-customer-row"><b>Guarantor CNIC</b><strong className="ci-customer-value">{data.guarantorCnic}</strong></div>}
+      {installment && <>
+        <div className="ci-customer-row"><b>Phone / CNIC</b><strong className="ci-customer-value">{[data.customerPhone, data.customerCnic].filter(Boolean).join('  |  ') || 'Not provided'}</strong></div>
+        <div className="ci-customer-row"><b>Guarantor</b><strong className="ci-customer-value">{[data.guarantorName, data.guarantorCnic].filter(Boolean).join('  |  ') || 'Not provided'}</strong></div>
+      </>}
     </section>
   );
 }

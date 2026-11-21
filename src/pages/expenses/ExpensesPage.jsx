@@ -224,6 +224,13 @@ export default function ExpensesView({ expenses = [], bankAccounts = [], onRefre
                       >
                         Edit
                       </button>
+                      <button type="button" className="btn danger small" onClick={() => showAlert('Delete expense?', `This removes ${exp.expenseNo || exp.title} and reverses its bank balance and ledger entry.`, 'danger', 'Delete expense', async () => {
+                        try {
+                          await apiRequest(`/expenses/${encodeURIComponent(exp.id)}`, { method: 'DELETE' });
+                          await onRefresh();
+                          notify('Expense deleted and its balance impact reversed.');
+                        } catch (error) { showAlert('Could not delete expense', error.message, 'warning'); }
+                      })}>Delete</button>
                       <button
                         type="button"
                         className="btn secondary small"

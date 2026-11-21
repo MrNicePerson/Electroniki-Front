@@ -128,14 +128,22 @@ export default function ReportsView({
     notify(`Exported ${activeReport} report to CSV.`);
   }
 
+  function printReport() {
+    document.body.classList.add('report-printing');
+    const cleanup = () => document.body.classList.remove('report-printing');
+    window.addEventListener('afterprint', cleanup, { once: true });
+    window.print();
+    window.setTimeout(cleanup, 30000);
+  }
+
   return (
-    <>
+    <div className="reports-page">
       <div className="page-head">
         <div>
           <h1>Reports & Analytics</h1>
         </div>
         <div className="head-actions">
-          <button type="button" className="btn secondary" onClick={() => window.print()}>
+          <button type="button" className="btn secondary" onClick={printReport}>
             Print Report
           </button>
           <button type="button" className="btn" onClick={exportReportCsv}>
@@ -486,6 +494,6 @@ export default function ReportsView({
           </div>
         )}
       </section>
-    </>
+    </div>
   );
 }

@@ -14,9 +14,9 @@ export default function SalesInvoiceA5({ invoice }) {
     ['Amount Paid', money(invoice.paid)],
     ['Remaining Balance', money(invoice.balance), true],
     ['Payment Method', invoice.paymentMethod, true],
-    ...(invoice.paymentMethod === 'Bank' && invoice.bankName ? [['Bank', invoice.bankName]] : []),
+    ...(invoice.paymentMethod.includes('Bank') && invoice.bankName ? [['Bank', invoice.bankName]] : []),
   ];
-  const tableHeight = Math.max(55, 77 - Math.max(0, rows.length - 3) * 7);
+  const tableHeight = Math.max(55, 77 - Math.max(0, rows.length - 5) * 3);
   return Array.from({ length: pageCount }, (_, pageIndex) => {
     const lastPage = pageIndex === pageCount - 1;
     return (
@@ -26,9 +26,9 @@ export default function SalesInvoiceA5({ invoice }) {
         {lastPage ? <>
           <div className="ci-bottom ci-sales-bottom">
             <SummaryTable rows={rows} />
-            <div className="ci-right-stack ci-sales-right-stack">
-              <Terms terms={invoice.terms} />
-            </div>
+              <div className="ci-right-stack ci-sales-right-stack">
+                <Terms terms={invoice.terms} />
+              </div>
           </div>
           <Signature shopName={invoice.shop.name} />
         </> : <div className="ci-continuation">Continued on next page</div>}

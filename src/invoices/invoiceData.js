@@ -24,11 +24,10 @@ export function createInstallmentSchedule(balance, installmentCount, suggestedAm
 function formatDate(value) {
   if (!value) return '';
   const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? String(value)
-    : [date.getDate(), date.getMonth() + 1, date.getFullYear()]
-        .map((part, index) => String(part).padStart(index === 2 ? 4 : 2, '0'))
-        .join('-');
+  if (Number.isNaN(date.getTime())) return String(value);
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Karachi', day: '2-digit', month: '2-digit', year: 'numeric',
+  }).format(date);
 }
 
 /** Shape a persisted app sale and shop settings for the A5 invoice components. */
@@ -46,15 +45,21 @@ export function toInvoiceModel(sale = {}, shop = {}) {
   const paid = Math.min(total, Math.max(0, Number.isFinite(rawPaid) ? rawPaid : 0));
   const paymentDetails = sale.paymentDetails || {};
   const methodValue = String(paymentDetails.method || sale.paymentMethod || 'cash').toLowerCase();
-  const paymentMethod = methodValue.includes('bank') ? 'Bank' : 'Cash';
+  const cashAmount = Number(paymentDetails.cash) || Number(sale.cashCollected) || 0;
+  const bankAmount = Number(paymentDetails.bank) || Number(sale.bankCollected) || 0;
+  const paymentMethod = cashAmount > 0 && bankAmount > 0 ? 'Cash + Bank' : methodValue.includes('bank') || bankAmount > 0 ? 'Bank' : 'Cash';
+  const installmentPlan = sale.installmentDetails?.plan || {};
 
   return {
     invoiceNo: sale.invoiceNo || sale.id || '',
+    type: sale.type || 'cash',
     padNo: String(sale.padNo || '').trim(),
     date: formatDate(sale.createdAt || sale.date),
     customerName: sale.customer || sale.customerName || '',
     customerAddress: sale.address || '',
     customerPhone: sale.whatsapp || sale.phone || '',
+    customerCnic: sale.cnic || '',
+    guarantorName: sale.guarantor || '',
     items,
     subtotal: gross,
     discount: Number(sale.billDiscount) || 0,
@@ -67,7 +72,9 @@ export function toInvoiceModel(sale = {}, shop = {}) {
     months: Math.max(0, Math.floor(Number(sale.months) || 0)),
     monthly: Number(sale.monthly) || 0,
     paymentMethod,
-    bankName: paymentDetails.bankName || paymentDetails.bank || '',
+    bankName: paymentDetails.bankName || '',
+    startDate: formatDate(installmentPlan.startDate || sale.planStart),
+    nextDueDate: formatDate(installmentPlan.nextDueDate || sale.nextDueDate),
     terms: [],
     footerNote: shop.receiptFooter || '',
     shop: {

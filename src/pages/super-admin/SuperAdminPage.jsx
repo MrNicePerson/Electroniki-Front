@@ -3,9 +3,9 @@ import { Building2, FileText, KeyRound, LogOut, Plus, Search, ShieldCheck, Store
 import { apiRequest } from '../../api.js';
 import './super-admin.css';
 
-const emptyShopForm = { shopName: '', ownerName: '', email: '', password: '', phone: '', whatsapp: '', city: '', address: '' };
-const emptyUserForm = { shopId: '', name: '', email: '', password: '', role: 'shop_account' };
 const invoiceThemeColors = { blue: '#0757a6', teal: '#0f766e', violet: '#6d3fb3', graphite: '#3f4b5b' };
+const emptyShopForm = { shopName: '', ownerName: '', email: '', password: '', phone: '', whatsapp: '', city: '', address: '', geminiApiKey: '', invoiceTheme: 'blue', accentColor: invoiceThemeColors.blue, invoiceLogo: '' };
+const emptyUserForm = { shopId: '', name: '', email: '', password: '', role: 'shop_account' };
 
 export default function SuperAdminPage({ user, onLogout }) {
   const [summary, setSummary] = useState({ shops: [], users: [] });
@@ -19,7 +19,7 @@ export default function SuperAdminPage({ user, onLogout }) {
   const [editingUser, setEditingUser] = useState(null);
   const [shopForm, setShopForm] = useState(emptyShopForm);
   const [userForm, setUserForm] = useState(emptyUserForm);
-  const [designForm, setDesignForm] = useState({ shopId: '', theme: 'blue', accentColor: invoiceThemeColors.blue, logo: '', removeLogo: false });
+  const [designForm, setDesignForm] = useState({ shopId: '', theme: 'blue', accentColor: invoiceThemeColors.blue, logo: '', removeLogo: false, geminiApiKey: '', removeGeminiApiKey: false, geminiConfigured: false });
 
   async function loadSummary() {
     setError('');
@@ -58,14 +58,14 @@ export default function SuperAdminPage({ user, onLogout }) {
     if (!shop) return;
     const design = shop.invoiceDesign || {};
     setError(''); setNotice('');
-    setDesignForm({ shopId: String(shop.id), theme: design.theme || 'blue', accentColor: design.accentColor || invoiceThemeColors[design.theme] || invoiceThemeColors.blue, logo: '', removeLogo: false });
+    setDesignForm({ shopId: String(shop.id), theme: design.theme || 'blue', accentColor: design.accentColor || invoiceThemeColors[design.theme] || invoiceThemeColors.blue, logo: '', removeLogo: false, geminiApiKey: '', removeGeminiApiKey: false, geminiConfigured: Boolean(shop.geminiConfigured) });
     setModal('design');
   }
 
   function changeDesignShop(shopId) {
     const shop = summary.shops.find((item) => String(item.id) === String(shopId));
     const design = shop?.invoiceDesign || {};
-    setDesignForm({ shopId: String(shopId), theme: design.theme || 'blue', accentColor: design.accentColor || invoiceThemeColors[design.theme] || invoiceThemeColors.blue, logo: '', removeLogo: false });
+    setDesignForm({ shopId: String(shopId), theme: design.theme || 'blue', accentColor: design.accentColor || invoiceThemeColors[design.theme] || invoiceThemeColors.blue, logo: '', removeLogo: false, geminiApiKey: '', removeGeminiApiKey: false, geminiConfigured: Boolean(shop?.geminiConfigured) });
   }
 
   function chooseInvoiceLogo(event) {
@@ -82,15 +82,27 @@ export default function SuperAdminPage({ user, onLogout }) {
     reader.readAsDataURL(file);
   }
 
+  function chooseShopLogo(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 240 * 1024) {
+      setError('Choose a PNG, JPEG, or WebP logo smaller than 240 KB.'); event.target.value = ''; return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setShopForm((current) => ({ ...current, invoiceLogo: String(reader.result || '') }));
+    reader.onerror = () => setError('The logo could not be read. Please choose it again.');
+    reader.readAsDataURL(file);
+  }
+
   async function saveInvoiceDesign(event) {
     event.preventDefault(); setSaving(true); setError(''); setNotice('');
     try {
       await apiRequest(`/admin/shops/${designForm.shopId}/invoice-design`, {
         method: 'PUT',
-        body: { invoiceDesign: { theme: designForm.theme, accentColor: designForm.accentColor, ...(designForm.logo ? { logo: designForm.logo } : {}), removeLogo: designForm.removeLogo } },
+        body: { invoiceDesign: { theme: designForm.theme, accentColor: designForm.accentColor, ...(designForm.logo ? { logo: designForm.logo } : {}), removeLogo: designForm.removeLogo }, geminiApiKey: designForm.geminiApiKey, removeGeminiApiKey: designForm.removeGeminiApiKey },
       });
       const shopName = summary.shops.find((shop) => String(shop.id) === designForm.shopId)?.name || 'shop';
-      setModal(''); setNotice(`Invoice design saved for ${shopName}.`); await loadSummary();
+      setModal(''); setNotice(`Invoice design and Gemini settings saved for ${shopName}.`); await loadSummary();
     } catch (err) { setError(err.message || 'Could not save invoice design.'); }
     finally { setSaving(false); }
   }
@@ -104,8 +116,10 @@ export default function SuperAdminPage({ user, onLogout }) {
   async function submitShop(event) {
     event.preventDefault(); setSaving(true); setError(''); setNotice('');
     try {
-      await apiRequest('/admin/shops', { method: 'POST', body: shopForm });
-      setModal(''); setNotice(`Created ${shopForm.shopName} and its owner account.`); await loadSummary();
+      const { invoiceTheme, accentColor, invoiceLogo, ...shopDetails } = shopForm;
+      await apiRequest('/admin/shops', { method: 'POST', body: { ...shopDetails, invoiceDesign: { theme: invoiceTheme, accentColor, logo: invoiceLogo } } });
+      const createdName = shopForm.shopName;
+      setShopForm(emptyShopForm); setModal(''); setNotice(`Created ${createdName}, its owner account, Gemini configuration, and invoice design.`); await loadSummary();
     } catch (err) { setError(err.message || 'Could not create the shop.'); }
     finally { setSaving(false); }
   }
@@ -188,7 +202,10 @@ export default function SuperAdminPage({ user, onLogout }) {
             <div className="platform-admin-form-row"><label>Theme<select value={designForm.theme} onChange={(event) => setDesignForm({ ...designForm, theme: event.target.value, accentColor: invoiceThemeColors[event.target.value] || invoiceThemeColors.blue })}><option value="blue">Classic Blue</option><option value="teal">Teal</option><option value="violet">Violet</option><option value="graphite">Graphite</option></select></label><label>Accent color<input type="color" value={designForm.accentColor} onChange={(event) => setDesignForm({ ...designForm, accentColor: event.target.value })} style={{ width: 80, padding: 3 }} /></label></div>
             <label>Shop logo (PNG, JPEG, or WebP; max 240 KB)<input type="file" accept="image/png,image/jpeg,image/webp" onChange={chooseInvoiceLogo} /></label>
             {(() => { const selected = summary.shops.find((shop) => String(shop.id) === designForm.shopId); const preview = designForm.logo || (designForm.removeLogo ? '' : selected?.invoiceDesign?.logo || ''); return preview ? <div className="platform-admin-logo-preview"><img src={preview} alt="Selected shop logo preview" /><button type="button" className="btn ghost small" onClick={() => setDesignForm({ ...designForm, logo: '', removeLogo: true })}>Remove logo</button></div> : null; })()}
-            <p className="platform-admin-form-note">Invoice design is isolated per shop; accounts in a shop share its invoice branding.</p>
+            <label>Gemini API key for this shop<input type="password" autoComplete="new-password" value={designForm.geminiApiKey} onChange={(event) => setDesignForm({ ...designForm, geminiApiKey: event.target.value, removeGeminiApiKey: false })} placeholder={designForm.geminiConfigured ? 'Saved key — enter a new key to replace it' : 'Paste this shop’s Gemini API key'} /></label>
+            <div className="platform-admin-form-note">Gemini key status: <b>{designForm.removeGeminiApiKey ? 'Will be removed' : designForm.geminiConfigured ? 'Configured' : 'Not configured'}</b>. Keys are encrypted in the database and never shown in shop accounts. Leave blank to keep the current key.</div>
+            {designForm.geminiConfigured && <button type="button" className="btn ghost small" onClick={() => setDesignForm({ ...designForm, removeGeminiApiKey: !designForm.removeGeminiApiKey, geminiApiKey: '' })}>{designForm.removeGeminiApiKey ? 'Keep saved Gemini key' : 'Remove Gemini key'}</button>}
+            <p className="platform-admin-form-note">Invoice design and Gemini access are isolated per shop; shop accounts share that shop’s invoice branding and use its Gemini key.</p>
             <div className="platform-admin-modal-actions"><button type="button" className="btn ghost" onClick={() => setModal('')}>Cancel</button><button type="submit" className="btn" disabled={saving}>{saving ? 'Saving…' : 'Save invoice design'}</button></div>
           </form> : modal === 'shop' ? <form onSubmit={submitShop} className="platform-admin-form">
             <label>Shop name<input required value={shopForm.shopName} onChange={(event) => setShopForm({ ...shopForm, shopName: event.target.value })} /></label>
@@ -196,6 +213,11 @@ export default function SuperAdminPage({ user, onLogout }) {
             <div className="platform-admin-form-row"><label>Owner email<input type="email" required autoComplete="off" value={shopForm.email} onChange={(event) => setShopForm({ ...shopForm, email: event.target.value })} /></label><label>Temporary password<input type="password" required minLength="12" autoComplete="new-password" value={shopForm.password} onChange={(event) => setShopForm({ ...shopForm, password: event.target.value })} /></label></div>
             <div className="platform-admin-form-row"><label>Phone<input value={shopForm.phone} onChange={(event) => setShopForm({ ...shopForm, phone: event.target.value })} /></label><label>WhatsApp<input value={shopForm.whatsapp} onChange={(event) => setShopForm({ ...shopForm, whatsapp: event.target.value })} /></label></div>
             <div className="platform-admin-form-row"><label>City<input value={shopForm.city} onChange={(event) => setShopForm({ ...shopForm, city: event.target.value })} /></label><label>Address<input value={shopForm.address} onChange={(event) => setShopForm({ ...shopForm, address: event.target.value })} /></label></div>
+            <div className="platform-admin-form-row"><label>Invoice theme<select value={shopForm.invoiceTheme} onChange={(event) => setShopForm({ ...shopForm, invoiceTheme: event.target.value, accentColor: invoiceThemeColors[event.target.value] || invoiceThemeColors.blue })}><option value="blue">Classic Blue</option><option value="teal">Teal</option><option value="violet">Violet</option><option value="graphite">Graphite</option></select></label><label>Invoice accent color<input type="color" value={shopForm.accentColor} onChange={(event) => setShopForm({ ...shopForm, accentColor: event.target.value })} style={{ width: 80, padding: 3 }} /></label></div>
+            <label>Invoice logo (PNG, JPEG, or WebP; max 240 KB)<input type="file" accept="image/png,image/jpeg,image/webp" onChange={chooseShopLogo} /></label>
+            {shopForm.invoiceLogo && <div className="platform-admin-logo-preview"><img src={shopForm.invoiceLogo} alt="New shop invoice logo preview" /><button type="button" className="btn ghost small" onClick={() => setShopForm({ ...shopForm, invoiceLogo: '' })}>Remove logo</button></div>}
+            <label>Gemini API key for this shop<input type="password" autoComplete="new-password" value={shopForm.geminiApiKey} onChange={(event) => setShopForm({ ...shopForm, geminiApiKey: event.target.value })} placeholder="Paste the shop’s own Gemini API key" /></label>
+            <p className="platform-admin-form-note">Gemini key is optional, encrypted in the database, and used only for this shop’s supplier invoice OCR. Invoice logo and colors are applied to this shop’s sales and installment invoices.</p>
             <p className="platform-admin-form-note">Use a unique email and at least 12 characters for the temporary password.</p>
             <div className="platform-admin-modal-actions"><button type="button" className="btn ghost" onClick={() => setModal('')}>Cancel</button><button type="submit" className="btn" disabled={saving}>{saving ? 'Creating…' : 'Create shop'}</button></div>
           </form> : <form onSubmit={modal === 'edit' ? saveUser : submitUser} className="platform-admin-form">

@@ -311,6 +311,7 @@ export default function App() {
   const [khataSearch, setKhataSearch] = useState('');
   const [showAddInstallmentModal, setShowAddInstallmentModal] = useState(false);
   const [activeKhataPlan, setActiveKhataPlan] = useState(null);
+  const [selectedInstallmentPayment, setSelectedInstallmentPayment] = useState(null);
   const [khataPayAmount, setKhataPayAmount] = useState('');
   const [khataPayMethod, setKhataPayMethod] = useState('cash');
   const [khataPayBank, setKhataPayBank] = useState('');
@@ -457,6 +458,15 @@ export default function App() {
   const gross = cart.reduce((s, i) => s + num(i.price) * Math.max(1, num(i.qty)), 0);
   const appliedDiscount = Math.min(gross, num(billDiscount));
   const discounted = Math.max(0, gross - appliedDiscount);
+
+  function availableStockForProduct(product) {
+    const reserved = (data.heldOrders || [])
+      .filter((order) => order.status === 'Held' && String(order.id) !== String(resumedHeldOrderId || ''))
+      .reduce((sum, order) => sum + (order.cartItems || [])
+        .filter((item) => String(item.productId || item.id || '') === String(product.id))
+        .reduce((qty, item) => qty + Math.max(0, Math.floor(num(item.qty))), 0), 0);
+    return Math.max(0, num(product.stock) - reserved);
+  }
   const add = saleType === 'installment' ? Math.round((discounted * num(plan.percent)) / 100) : 0;
   const finalTotal = discounted + add;
 
@@ -507,10 +517,11 @@ export default function App() {
     );
     const existingInCart = matchingCartLines.reduce((s, c) => s + num(c.qty), 0);
 
-    if (existingInCart + reqQty > num(prod.stock)) {
+    const availableQty = availableStockForProduct(prod);
+    if (existingInCart + reqQty > availableQty) {
       showAlert(
         'Insufficient stock',
-        `"${prod.name}" has only ${prod.stock} unit${prod.stock === 1 ? '' : 's'} available in stock.`,
+        `"${prod.name}" has only ${availableQty} unit${availableQty === 1 ? '' : 's'} available after held bills are reserved.`,
         'warning'
       );
       return;
@@ -555,14 +566,14 @@ export default function App() {
     const item = cart[idx];
     if (!item) return;
     const prod = data.products.find((p) => p.id === (item.productId || item.id));
-    const maxStock = prod ? num(prod.stock) : 999;
+    const maxStock = prod ? availableStockForProduct(prod) : 999;
 
     if (field === 'qty') {
       const nextQty = Math.max(1, Math.floor(num(val)));
       if (nextQty > maxStock) {
         showAlert(
           'Stock limit reached',
-          `Only ${maxStock} unit${maxStock === 1 ? '' : 's'} of "${item.name}" available in inventory.`,
+            `Only ${maxStock} unit${maxStock === 1 ? '' : 's'} of "${item.name}" are available after held bills are reserved.`,
           'warning'
         );
         return;
@@ -849,13 +860,13 @@ export default function App() {
         .filter((p) => {
           const q = productSearch.trim().toLowerCase();
           return (
-            p.active !== false &&
+            p.active !== false && availableStockForProduct(p) > 0 &&
             (p.name.toLowerCase().includes(q) ||
               p.code.toLowerCase().includes(q) ||
               (p.barcode && p.barcode.toLowerCase().includes(q)))
           );
         })
-        .slice(0, 6)
+        .slice(0, 6).map((product) => ({ ...product, stock: availableStockForProduct(product) }))
     : [];
   const currentPageGroup = PAGE_GROUPS.find((group) =>
     group.pages.some(([pageKey]) => pageKey === page)
@@ -863,8 +874,8 @@ export default function App() {
 
   const newSalePageContext = { data, page, cart, setCart, customerId, setCustomerId, salePhone, setSalePhone, saleCnic, setSaleCnic, saleAddress, setSaleAddress, salePadNo, setSalePadNo, customerInfo, setCustomerInfo, billDiscount, setBillDiscount, saleType, setSaleType, plan, setPlan, salePayment, setSalePayment, resumedHeldOrderId, setResumedHeldOrderId, productSearch, setProductSearch, setSelectedSearchProductId, newQty, setNewQty, newPrice, setNewPrice, showSuggestions, setShowSuggestions, savingSale, setShowInstallmentCustomerModal, setShowNewCustomerModal, setEditingCustomerRecord, showAlert, gross, appliedDiscount, discounted, add, finalTotal, resetSaleAmounts, cashRec, advanceOrPaid, remainingBalance, excessPayment, monthlyInstallment, handleAddItemToCart, updateCartItemField, handleHoldBill, handleSaveSale, dateText, matchingSearchProducts };
   const dashboardPageContext = { data, page, setPage, dashPeriod, setDashPeriod, dashDate, setDashDate, showAlert };
-  const installmentKhataPageContext = { data, page, plan, khataSearch, setKhataSearch, setShowAddInstallmentModal, setActiveKhataPlan, setKhataPayAmount, dateText };
-  const stockProductsPageContext = { optionalWarrantyValue, data, page, setPage, inventorySearch, setInventorySearch, inventoryChip, setInventoryChip, stockTab, setStockTab, setEditingProduct, setShowProductModal, showAlert };
+  const installmentKhataPageContext = { data, page, plan, khataSearch, setKhataSearch, setShowAddInstallmentModal, setActiveKhataPlan, setKhataPayAmount, dateText, refreshWorkspace, showAlert, notify };
+  const stockProductsPageContext = { optionalWarrantyValue, data, page, setPage, inventorySearch, setInventorySearch, inventoryChip, setInventoryChip, stockTab, setStockTab, setEditingProduct, setShowProductModal, showAlert, refreshWorkspace, notify };
   return (
     <>
       <div className="shell" id="shell">
@@ -1138,6 +1149,13 @@ export default function App() {
                   setEditingCustomerRecord(c);
                   setShowNewCustomerModal(true);
                 }}
+                onDeleteCustomer={(customer) => showAlert('Delete customer?', `${customer.name} can be deleted only if there are no linked sales, installment plans, or credit balance.`, 'danger', 'Delete customer', async () => {
+                  try {
+                    await apiRequest(`/customers/${encodeURIComponent(customer.id)}`, { method: 'DELETE' });
+                    await refreshWorkspace();
+                    notify('Customer deleted.');
+                  } catch (error) { showAlert('Could not delete customer', error.message, 'warning'); }
+                })}
               />
             )}
 
@@ -1908,6 +1926,7 @@ export default function App() {
                           <th>Method</th>
                           <th>Amount</th>
                           <th>Note</th>
+                          <th>Record</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1926,6 +1945,7 @@ export default function App() {
                               <strong>{money(p.amount)}</strong>
                             </td>
                             <td>{p.note || p.reference || '—'}</td>
+                            <td><button type="button" className="btn ghost small" onClick={() => setSelectedInstallmentPayment({ ...p, customerName: activeKhataPlan.customerName, planNo: activeKhataPlan.planNo, invoiceNo: activeKhataPlan.invoiceNo })}>View</button></td>
                           </tr>
                         ))}
                       </tbody>
@@ -1943,6 +1963,23 @@ export default function App() {
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {selectedInstallmentPayment && (
+        <div className="modal-backdrop" onClick={(event) => event.target === event.currentTarget && setSelectedInstallmentPayment(null)}>
+          <div className="modal" role="dialog" aria-modal="true">
+            <div className="modal-head"><div><h2>Installment Receipt · {selectedInstallmentPayment.receiptNo}</h2><p>{selectedInstallmentPayment.customerName} · {selectedInstallmentPayment.planNo || selectedInstallmentPayment.invoiceNo}</p></div><button type="button" className="icon-btn" onClick={() => setSelectedInstallmentPayment(null)}>×</button></div>
+            <div className="modal-body"><div className="installment-detail-grid">
+              <div className="installment-detail-field"><small>Received date</small><b>{selectedInstallmentPayment.createdAt ? new Date(selectedInstallmentPayment.createdAt).toLocaleString('en-GB', { timeZone: 'Asia/Karachi', dateStyle: 'medium', timeStyle: 'short' }) : 'Date not recorded'}</b></div>
+              <div className="installment-detail-field"><small>Amount</small><b>{money(selectedInstallmentPayment.amount)}</b></div>
+              <div className="installment-detail-field"><small>Payment method</small><b>{String(selectedInstallmentPayment.method || 'cash').toUpperCase()}{selectedInstallmentPayment.bankName ? ` · ${selectedInstallmentPayment.bankName}` : ''}</b></div>
+              <div className="installment-detail-field"><small>Reference</small><b>{selectedInstallmentPayment.reference || '-'}</b></div>
+              <div className="installment-detail-field"><small>Received by</small><b>{selectedInstallmentPayment.receivedBy || '-'}</b></div>
+              <div className="installment-detail-field"><small>Note</small><b>{selectedInstallmentPayment.note || '-'}</b></div>
+            </div></div>
+            <div className="modal-actions"><button type="button" className="btn" onClick={() => setSelectedInstallmentPayment(null)}>Close</button></div>
           </div>
         </div>
       )}

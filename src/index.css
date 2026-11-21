@@ -3723,6 +3723,15 @@ textarea:focus-visible {
   .ci-design-preview-sheet .ci-page { zoom:.5; }
 }
 @media print {
+  body.report-printing *{visibility:hidden!important}
+  body.report-printing .reports-page,body.report-printing .reports-page *{visibility:visible!important}
+  body.report-printing .reports-page{position:absolute;inset:0 auto auto 0;width:100%;padding:8mm;background:#fff!important;overflow:visible!important}
+  body.report-printing .reports-page .head-actions,body.report-printing .reports-page input,body.report-printing .reports-page select{display:none!important}
+  body.report-printing .reports-page .card,body.report-printing .reports-page section{break-inside:avoid;box-shadow:none!important}
+  body.report-printing .reports-page .table-wrap{overflow:visible!important}
+  body.report-printing .reports-page table{width:100%;border-collapse:collapse}
+  body.report-printing .reports-page th,body.report-printing .reports-page td{padding:5px;border:1px solid #9aabb4;color:#111}
+  body.report-printing .reports-page{color:#111}
   @page { size:A5 portrait; margin:0; }
   .ci-design-preview { min-height:0; padding:0; background:#fff; }
   .ci-design-preview-nav { display:none !important; }

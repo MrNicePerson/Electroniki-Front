@@ -193,6 +193,7 @@ export default function ReturnsView({
                 <tr>
                   <th>Return ID</th>
                   <th>Original Invoice</th>
+                  <th>Return Date</th>
                   <th>Customer</th>
                   <th>Returned Items</th>
                   <th>Reason</th>
@@ -209,6 +210,7 @@ export default function ReturnsView({
                       <strong>{r.returnNo}</strong>
                     </td>
                     <td>{r.invoiceNo}</td>
+                    <td>{r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-GB', { timeZone: 'Asia/Karachi', day: '2-digit', month: 'short', year: 'numeric' }) : '-'}</td>
                     <td>{r.customerName}</td>
                     <td>
                       {(r.items || []).map((i) => `${i.name} × ${i.qty}`).join(', ')}

@@ -171,6 +171,13 @@ export default function SuppliersView({
                           Pay Supplier
                         </button>
                       )}
+                      <button type="button" className="btn danger small" onClick={() => showAlert('Delete supplier?', `${s.name} can be removed only when no invoice, payment, or payable is linked to the account.`, 'danger', 'Delete supplier', async () => {
+                        try {
+                          await apiRequest(`/suppliers/${encodeURIComponent(s.id)}`, { method: 'DELETE' });
+                          await onRefresh();
+                          notify('Supplier deleted.');
+                        } catch (error) { showAlert('Could not delete supplier', error.message, 'warning'); }
+                      })}>Delete</button>
                     </div>
                   </td>
                 </tr>
@@ -394,6 +401,7 @@ export default function SuppliersView({
                       <thead>
                         <tr>
                           <th>Tx #</th>
+                          <th>Date</th>
                           <th>Method</th>
                           <th>Reference</th>
                           <th>Amount</th>
@@ -403,6 +411,7 @@ export default function SuppliersView({
                         {pays.map((p) => (
                           <tr key={p.id}>
                             <td>{p.txNo}</td>
+                            <td>{p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-GB', { timeZone: 'Asia/Karachi', day: '2-digit', month: 'short', year: 'numeric' }) : '-'}</td>
                             <td style={{ textTransform: 'capitalize' }}>
                               {p.method} {p.bankName ? `(${p.bankName})` : ''}
                             </td>
