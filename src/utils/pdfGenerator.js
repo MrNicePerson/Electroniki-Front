@@ -268,7 +268,7 @@ export function generateInvoicePdf(sale, shop, { download = true } = {}) {
 }
 
 /**
- * Normalizes a Pakistani or international phone number for wa.me links.
+ * Normalizes a Pakistani or international phone number for invoice delivery.
  */
 export function normalizeWhatsAppPhone(rawPhone) {
   const digits = String(rawPhone || '').replace(/[^0-9]/g, '');
@@ -281,9 +281,7 @@ export function normalizeWhatsAppPhone(rawPhone) {
 }
 
 /**
- * Builds the wa.me URL and message text for sharing an invoice PDF on WhatsApp.
- * Uses the shop's saved WhatsApp number in Settings as the sender contact reference
- * and targets the customer's WhatsApp number (or opens WhatsApp contact picker if blank).
+ * Builds the invoice message and resolves the saved customer WhatsApp number.
  */
 export function buildWhatsAppInvoiceShare(sale, shop) {
   const shopName = shop?.name || 'Electronics Shop';
@@ -311,12 +309,7 @@ export function buildWhatsAppInvoiceShare(sale, shop) {
 
   const text = lines.join('\n');
   const targetPhone = customerPhone;
-  const waUrl = targetPhone
-    ? `https://wa.me/${targetPhone}?text=${encodeURIComponent(text)}`
-    : `https://wa.me/?text=${encodeURIComponent(text)}`;
-
   return {
-    waUrl,
     text,
     targetPhone,
     shopWhatsApp: shopWa,

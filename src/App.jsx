@@ -700,10 +700,8 @@ export default function App() {
       const invoiceElement = document.querySelector('.invoice-preview-backdrop .ci-preview-host');
       const pdf = await createInvoiceElementPdf(invoiceElement, fileName);
       const share = buildWhatsAppInvoiceShare(bill, data.shop);
-      const file = typeof File === 'undefined' ? null : new File([pdf.blob], fileName, { type: 'application/pdf' });
-      const supportsFileShare = Boolean(file && navigator.share && navigator.canShare?.({ files: [file] }));
-      generatedShare = { bill, fileName, blob: pdf.blob, file, supportsFileShare, ...share };
-      if (!share.targetPhone) throw new Error('No valid customer WhatsApp number is saved on this invoice. The PDF is ready to download and share manually.');
+      generatedShare = { bill, fileName, blob: pdf.blob, ...share };
+      if (!share.targetPhone) throw new Error('No valid customer WhatsApp number is saved on this invoice. The PDF is ready to download.');
       await apiRequest('/whatsapp/invoice-document', {
         method: 'POST',
         body: {
@@ -754,15 +752,6 @@ export default function App() {
     }
   }
 
-  async function shareInvoicePdf() {
-    if (!whatsAppShareInfo?.file || !navigator.share) return;
-    try {
-      await navigator.share({ files: [whatsAppShareInfo.file], title: `Invoice ${whatsAppShareInfo.bill?.invoiceNo || ''}`, text: whatsAppShareInfo.text });
-    } catch (error) {
-      if (error?.name !== 'AbortError') showAlert('Could not share invoice', error?.message || 'Download the PDF and attach it manually in WhatsApp.', 'warning');
-    }
-  }
-
   async function sendInvoicePdfDirectly() {
     if (!whatsAppShareInfo?.targetPhone || !whatsAppShareInfo?.blob || sendingWhatsAppInvoiceRef.current) return;
     sendingWhatsAppInvoiceRef.current = true;
@@ -791,16 +780,10 @@ export default function App() {
 
   async function openWhatsAppForInvoice() {
     if (!whatsAppShareInfo) return;
-    if (whatsAppShareInfo.supportsFileShare) {
-      await shareInvoicePdf();
-      return;
-    }
     if (!whatsAppShareInfo.targetPhone) {
       showAlert('No customer WhatsApp number', 'Save a valid customer number on this invoice before sending its PDF.', 'warning');
       return;
     }
-    // wa.me can prefill text but cannot attach a local PDF. Send the document
-    // through the backend when this browser cannot share files natively.
     await sendInvoicePdfDirectly();
   }
 
@@ -2215,7 +2198,7 @@ export default function App() {
           <div className="modal" role="dialog" aria-modal="true">
             <div className="modal-head">
               <div>
-                <h2>Share Invoice PDF on WhatsApp</h2>
+                <h2>Send Invoice PDF on WhatsApp</h2>
                 <p>
                   Shop WhatsApp: {whatsAppShareInfo.shopWhatsApp || 'Configured in Settings'}
                 </p>
@@ -2230,7 +2213,7 @@ export default function App() {
             </div>
             <div className="modal-body">
               <div className="modal-note" style={{ marginTop: 0 }}>
-                A5 invoice PDF <b>{whatsAppShareInfo.fileName}</b> is ready. {whatsAppShareInfo.supportsFileShare ? 'Share the PDF using your device share window, then choose WhatsApp.' : 'This browser cannot share files directly; the app will send the PDF through the linked WhatsApp connection.'} {whatsAppShareInfo.targetPhone ? '' : 'No customer number is saved for this invoice.'}
+                A5 invoice PDF <b>{whatsAppShareInfo.fileName}</b> is ready to send through the shop’s linked WhatsApp account. {whatsAppShareInfo.targetPhone ? '' : 'No customer number is saved for this invoice.'}
               </div>
 
               <label className="field" style={{ marginTop: 14 }}>
@@ -2253,12 +2236,9 @@ export default function App() {
               >
                 Download A5 PDF
               </button>
-              <button type="button" className="btn" onClick={openWhatsAppForInvoice}>
-                {whatsAppShareInfo.supportsFileShare ? 'Share PDF to WhatsApp' : 'Send PDF through linked WhatsApp'}
+              <button type="button" className="btn" onClick={openWhatsAppForInvoice} disabled={!whatsAppShareInfo.targetPhone || sendingWhatsAppInvoice}>
+                {sendingWhatsAppInvoice ? 'Sending…' : 'Send PDF to customer'}
               </button>
-              {whatsAppShareInfo.supportsFileShare && whatsAppShareInfo.targetPhone && <button type="button" className="btn secondary" onClick={sendInvoicePdfDirectly} disabled={sendingWhatsAppInvoice}>
-                {sendingWhatsAppInvoice ? 'Sending…' : 'Send PDF directly to customer'}
-              </button>}
 
             </div>
           </div>
