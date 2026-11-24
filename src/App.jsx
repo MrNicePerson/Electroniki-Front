@@ -782,7 +782,7 @@ export default function App() {
       setWhatsAppShareInfo(null);
       showAlert('Invoice sent', `Invoice ${invoiceNo} PDF was sent to the customer's WhatsApp number.`, 'success');
     } catch (error) {
-      showAlert('Could not send invoice on WhatsApp', error?.message || 'Check the WhatsApp Cloud API setup and try again.', 'warning');
+      showAlert('Could not send invoice on WhatsApp', error?.message || 'Check that the shop WhatsApp account is connected and try again.', 'warning');
     } finally {
       sendingWhatsAppInvoiceRef.current = false;
       setSendingWhatsAppInvoice(false);
@@ -1767,9 +1767,9 @@ export default function App() {
                     <span>
                       <b>Customer agreed to monthly WhatsApp reminders</b>
                       <small style={{ display: 'block', marginTop: 4 }}>
-                        {data.shop?.whatsappAutomationConfigured
-                          ? 'When enabled in Settings, a reminder is sent daily at 8:00 AM after the due date until a payment is recorded in Khata, this plan is paid, or you turn reminders off.'
-                          : 'Save the WhatsApp Cloud API credentials and approved reminder template on the backend before messages can be sent.'}
+                        {data.shop?.automation?.installmentRemindersEnabled
+                          ? 'With customer consent and a connected shop WhatsApp account, a reminder is sent daily at 8:00 AM after the due date until a payment is recorded, the plan is paid, or reminders are turned off.'
+                          : 'Enable daily installment reminders in Settings and keep the shop WhatsApp account connected.'}
                       </small>
                     </span>
                   </label>

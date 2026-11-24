@@ -2,6 +2,14 @@ import NumericInput from '../../components/NumericInput.jsx';
 import React, { useEffect, useRef, useState } from 'react';
 import { apiRequest, setSessionToken, money, num } from '../../api.js';
 
+function normalizeAlertNumber(value) {
+  let digits = String(value || '').replace(/\D/g, '');
+  if (digits.startsWith('00')) digits = digits.slice(2);
+  if (digits.length === 11 && digits.startsWith('03')) digits = `92${digits.slice(1)}`;
+  else if (digits.length === 10 && digits.startsWith('3')) digits = `92${digits}`;
+  return /^\d{7,15}$/.test(digits) ? digits : '';
+}
+
 export default function SettingsView({ shop = {}, user = {}, users = [], onRefresh, notify, showAlert }) {
   const isOwner = user?.role === 'owner';
 
@@ -26,7 +34,7 @@ export default function SettingsView({ shop = {}, user = {}, users = [], onRefre
     shop.automation?.lowStockRecipients?.[1] ? `+${shop.automation.lowStockRecipients[1]}` : ''
   );
   const [savingShop, setSavingShop] = useState(false);
-  const [whatsappConnection, setWhatsappConnection] = useState({ enabled: false, status: 'loading', connected: false, phoneNumber: '', qrDataUrl: '' });
+  const [whatsappConnection, setWhatsappConnection] = useState({ status: 'connecting', connected: false, phoneNumber: null, qrDataUrl: null, error: null });
   const [linkingWhatsApp, setLinkingWhatsApp] = useState(false);
   const [disconnectingWhatsApp, setDisconnectingWhatsApp] = useState(false);
   const whatsappPollTimer = useRef(null);
@@ -43,15 +51,15 @@ export default function SettingsView({ shop = {}, user = {}, users = [], onRefre
   async function refreshWhatsAppConnection() {
     try {
       const result = await apiRequest('/whatsapp/connection/status');
-      const connection = result.connection || { enabled: false, status: 'disconnected' };
+      const connection = result.connection || { status: 'not_linked', connected: false };
       setWhatsappConnection(connection);
-      if (['starting', 'qr', 'authenticated'].includes(connection.status)) {
-        whatsappPollTimer.current = setTimeout(refreshWhatsAppConnection, 1500);
+      if (['connecting', 'qr_ready'].includes(connection.status)) {
+        whatsappPollTimer.current = setTimeout(refreshWhatsAppConnection, 3000);
       } else {
         whatsappPollTimer.current = null;
       }
     } catch (error) {
-      setWhatsappConnection({ enabled: false, status: 'error', connected: false, phoneNumber: '', qrDataUrl: '', error: error.message });
+      setWhatsappConnection({ status: 'not_linked', connected: false, phoneNumber: null, qrDataUrl: null, error: error.message });
       whatsappPollTimer.current = null;
     }
   }
@@ -68,7 +76,7 @@ export default function SettingsView({ shop = {}, user = {}, users = [], onRefre
       const result = await apiRequest('/whatsapp/connection/link', { method: 'POST', body: {} });
       setWhatsappConnection(result.connection);
       clearTimeout(whatsappPollTimer.current);
-      whatsappPollTimer.current = setTimeout(refreshWhatsAppConnection, 800);
+      whatsappPollTimer.current = setTimeout(refreshWhatsAppConnection, 3000);
     } catch (error) {
       showAlert('WhatsApp could not be linked', error.message, 'warning');
     } finally {
@@ -98,6 +106,12 @@ export default function SettingsView({ shop = {}, user = {}, users = [], onRefre
     }
     setSavingShop(true);
     try {
+      const normalizedAlertRecipients = [lowStockRecipientOne, lowStockRecipientTwo].map((value) => {
+        const rawValue = String(value || '').trim();
+        const normalized = normalizeAlertNumber(rawValue);
+        if (rawValue && !normalized) throw new Error('Enter a valid WhatsApp number or leave the alert number blank.');
+        return normalized;
+      });
       await apiRequest('/settings', {
         method: 'PUT',
         body: {
@@ -112,10 +126,12 @@ export default function SettingsView({ shop = {}, user = {}, users = [], onRefre
           automation: {
             installmentRemindersEnabled,
             lowStockAlertsEnabled,
-            lowStockRecipients: [lowStockRecipientOne, lowStockRecipientTwo],
+            lowStockRecipients: [...new Set(normalizedAlertRecipients)].filter(Boolean),
           },
         },
       });
+      setLowStockRecipientOne(normalizedAlertRecipients[0] ? `+${normalizedAlertRecipients[0]}` : '');
+      setLowStockRecipientTwo(normalizedAlertRecipients[1] && normalizedAlertRecipients[1] !== normalizedAlertRecipients[0] ? `+${normalizedAlertRecipients[1]}` : '');
       await onRefresh();
       notify('Shop settings saved.');
     } catch (err) {
@@ -329,19 +345,18 @@ export default function SettingsView({ shop = {}, user = {}, users = [], onRefre
                 <section className="field full" style={{ padding: 16, border: '1px solid #dbe7ed', borderRadius: 12, background: '#f7fbfd' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
                     <div>
-                      <b style={{ color: '#12303f' }}>WhatsApp Invoice Connection</b>
+                      <b style={{ color: '#12303f' }}>WhatsApp Connection</b>
                       <p className="muted tiny" style={{ margin: '5px 0 10px' }}>
-                        Status: <b>{whatsappConnection.status === 'connected' ? 'Connected' : whatsappConnection.status === 'qr' ? 'Waiting for QR scan' : whatsappConnection.status === 'starting' || whatsappConnection.status === 'authenticated' ? 'Connecting…' : whatsappConnection.status === 'disabled' ? 'Disabled by backend settings' : whatsappConnection.status === 'error' ? 'Connection error' : 'Not linked'}</b>
-                        {whatsappConnection.phoneNumber ? <> · Account: <b>+{whatsappConnection.phoneNumber}</b></> : null}
-                      </p>
+                        Status: <b style={whatsappConnection.connected ? { color: '#14804a' } : undefined}>{whatsappConnection.connected ? 'Connected' : whatsappConnection.status === 'qr_ready' ? 'Waiting for QR scan' : whatsappConnection.status === 'connecting' ? 'Connecting…' : 'Not linked'}</b>
+                        {whatsappConnection.phoneNumber ? <> · Account: <b>+{whatsappConnection.phoneNumber}</b></> : null</p>
                     </div>
                     {whatsappConnection.connected ? (
                       <button type="button" className="btn secondary" disabled={disconnectingWhatsApp} onClick={disconnectWhatsApp}>
                         {disconnectingWhatsApp ? 'Disconnecting…' : 'Disconnect'}
                       </button>
                     ) : (
-                      <button type="button" className="btn" disabled={!whatsappConnection.enabled || linkingWhatsApp || ['starting', 'qr', 'authenticated'].includes(whatsappConnection.status)} onClick={linkWhatsApp}>
-                        {linkingWhatsApp || ['starting', 'qr', 'authenticated'].includes(whatsappConnection.status) ? 'Starting…' : 'Link WhatsApp'}
+                      <button type="button" className="btn" disabled={linkingWhatsApp || ['connecting', 'qr_ready'].includes(whatsappConnection.status)} onClick={linkWhatsApp}>
+                        {linkingWhatsApp || ['connecting', 'qr_ready'].includes(whatsappConnection.status) ? 'Starting…' : 'Link WhatsApp'}
                       </button>
                     )}
                   </div>
@@ -352,13 +367,13 @@ export default function SettingsView({ shop = {}, user = {}, users = [], onRefre
                     </div>
                   )}
                   {whatsappConnection.error && <p className="muted tiny" role="alert" style={{ color: '#b42318', marginBottom: 0 }}>{whatsappConnection.error}</p>}
-                  {!whatsappConnection.enabled && <p className="muted tiny" style={{ marginBottom: 0 }}>Enable `WHATSAPP_WEB_ENABLED=true` on the backend. This QR connection is separate from Cloud API reminders and alerts.</p>}
+
                 </section>
               )}
               <div className="field full" style={{ padding: 16, border: '1px solid #dbe7ed', borderRadius: 12, background: '#f7fbfd' }}>
                 <b style={{ color: '#12303f' }}>WhatsApp Automations</b>
                 <p className="muted tiny" style={{ margin: '5px 0 12px' }}>
-                  Connection: <b>{shop.whatsappAutomationConfigured ? 'Ready' : 'Needs WhatsApp Cloud API setup'}</b>. Messages use approved WhatsApp templates.
+                  Invoice PDFs, installment reminders, and low-stock alerts use this linked WhatsApp account.
                 </p>
                 <label style={{ display: 'flex', gap: 9, alignItems: 'flex-start', marginBottom: 12 }}>
                   <input
