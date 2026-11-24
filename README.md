@@ -5,8 +5,8 @@ React/Vite user interface for the ElectroHub shop-management app. The backend is
 ```cmd
 mkdir ElectroHub
 cd ElectroHub
-git clone https://github.com/fezu22/Electoniki-F.git frontend
-git clone https://github.com/fezu22/Electoniki-B.git backend
+git clone https://github.com/MrNicePerson/Electroniki-Front.git frontend
+git clone https://github.com/MrNicePerson/Electroniki-Backend.git backend
 ```
 
 Set up the backend first using `backend/README.md` and `backend/.env.example`. Then open two terminals:
