@@ -289,7 +289,9 @@ export function buildWhatsAppInvoiceShare(sale, shop) {
   const shopName = shop?.name || 'Electronics Shop';
   const shopWa = shop?.whatsapp || shop?.phone || '';
   const invoiceNo = sale.invoiceNo || sale.id;
-  const customerPhone = normalizeWhatsAppPhone(sale.whatsapp || sale.phone || '');
+  const customerPhone = [sale.whatsapp, sale.phone]
+    .map(normalizeWhatsAppPhone)
+    .find((phone) => /^923\d{9}$/.test(phone)) || '';
 
   const lines = [
     `*${shopName}*`,
