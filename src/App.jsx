@@ -332,8 +332,7 @@ export default function App() {
   const [showNewCustomerModal, setShowNewCustomerModal] = useState(false);
   const [editingCustomerRecord, setEditingCustomerRecord] = useState(null);
   const [previewInvoice, setPreviewInvoice] = useState(null);
-  const [invoiceEditDraft, setInvoiceEditDraft] = useState(null);
-  const [savingInvoiceEdit, setSavingInvoiceEdit] = useState(false);
+  const [editingInvoice, setEditingInvoice] = useState(null);
   const [whatsAppShareInfo, setWhatsAppShareInfo] = useState(null);
   const [whatsAppRecipientInput, setWhatsAppRecipientInput] = useState('');
   const [sendingWhatsAppInvoice, setSendingWhatsAppInvoice] = useState(false);
@@ -436,7 +435,7 @@ export default function App() {
     setShowNewCustomerModal(false); setEditingCustomerRecord(null);
     setShowInstallmentCustomerModal(false); setShowAddInstallmentModal(false);
     setPreviewInvoice(null);
-    setInvoiceEditDraft(null);
+    setEditingInvoice(null);
     setWhatsAppShareInfo(null);
     setSidebarOpen(false);
     try {
@@ -469,7 +468,11 @@ export default function App() {
       .reduce((sum, order) => sum + (order.cartItems || [])
         .filter((item) => String(item.productId || item.id || '') === String(product.id))
         .reduce((qty, item) => qty + Math.max(0, Math.floor(num(item.qty))), 0), 0);
-    return Math.max(0, num(product.stock) - reserved);
+    const editingQty = editingInvoice?.items?.reduce((sum, item) =>
+      String(item.productId || item.id || '') === String(product.id)
+        ? sum + Math.max(0, Math.floor(num(item.qty)))
+        : sum, 0) || 0;
+    return Math.max(0, num(product.stock) + editingQty - reserved);
   }
   const add = saleType === 'installment' ? Math.round((discounted * num(plan.percent)) / 100) : 0;
   const finalTotal = discounted + add;
@@ -593,6 +596,10 @@ export default function App() {
   }
 
   async function handleHoldBill() {
+    if (editingInvoice) {
+      showAlert('Invoice is being edited', 'Finish or cancel this invoice edit before holding a bill.', 'warning');
+      return;
+    }
     if (cart.length === 0) {
       showAlert('Cart is empty', 'Add an item before holding a bill.', 'warning');
       return;
@@ -654,40 +661,43 @@ export default function App() {
         `sale-${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`}`;
     }
     try {
-      const res = await apiRequest('/sales', {
-        method: 'POST',
-        body: {
-          idempotencyKey: saleRequestKey.current,
-          heldOrderId: resumedHeldOrderId || undefined,
-          customerId,
-          customerInfo: customerInfo || {
-            name: selectedCustomerObj.name || 'Walk-in customer',
-            phone: salePhone || selectedCustomerObj.phone || '',
-            whatsapp: selectedCustomerObj.whatsapp || salePhone || selectedCustomerObj.phone || '',
-            cnic: saleCnic || selectedCustomerObj.cnic || '',
-            address: saleAddress || selectedCustomerObj.address || '',
-          },
-          padNo: salePadNo.trim(),
-          saleType,
-          items: cart,
-          billDiscount,
-          plan,
-          salePayment,
+      const salePayload = {
+        customerId,
+        customerInfo: customerInfo || {
+          name: selectedCustomerObj.name || 'Walk-in customer',
+          phone: salePhone || selectedCustomerObj.phone || '',
+          whatsapp: selectedCustomerObj.whatsapp || salePhone || selectedCustomerObj.phone || '',
+          cnic: saleCnic || selectedCustomerObj.cnic || '',
+          address: saleAddress || selectedCustomerObj.address || '',
         },
-      });
+        padNo: salePadNo.trim(),
+        saleType,
+        items: cart,
+        billDiscount,
+        plan,
+        salePayment,
+      };
+      const res = editingInvoice
+        ? await apiRequest(`/sales/${encodeURIComponent(editingInvoice.invoiceNo)}`, { method: 'PUT', body: salePayload })
+        : await apiRequest('/sales', {
+            method: 'POST',
+            body: { idempotencyKey: saleRequestKey.current, heldOrderId: resumedHeldOrderId || undefined, ...salePayload },
+          });
       setPreviewInvoice({ ...res.sale, padNo: res.sale.padNo || salePadNo.trim() });
+      const wasEditing = Boolean(editingInvoice);
+      setEditingInvoice(null);
       setCart([]);
       setResumedHeldOrderId('');
       setSalePadNo('');
       resetSaleAmounts();
-      notify(`Sale ${res.sale.invoiceNo} saved!`);
+      notify(wasEditing ? `Invoice ${res.sale.invoiceNo} updated.` : `Sale ${res.sale.invoiceNo} saved!`);
       try {
         await refreshWorkspace();
       } catch {
-        showAlert('Sale saved', `Invoice ${res.sale.invoiceNo} was saved, but the workspace could not refresh. Reload the page to see updated balances.`, 'warning');
+        showAlert(wasEditing ? 'Invoice updated' : 'Sale saved', `Invoice ${res.sale.invoiceNo} was ${wasEditing ? 'updated' : 'saved'}, but the workspace could not refresh. Reload the page to see updated balances.`, 'warning');
       }
     } catch (err) {
-      showAlert('Cannot complete sale', err.message, 'warning');
+      showAlert(editingInvoice ? 'Invoice could not be updated' : 'Cannot complete sale', err.message, 'warning');
     } finally {
       saleSaveInFlight.current = false;
       setSavingSale(false);
@@ -740,42 +750,71 @@ export default function App() {
 
   function beginInvoiceEdit() {
     if (!previewInvoice) return;
-    const phone = previewInvoice.whatsapp || previewInvoice.phone || '';
-    setInvoiceEditDraft({
-      invoiceNo: previewInvoice.invoiceNo || previewInvoice.id,
-      padNo: previewInvoice.padNo || '',
-      customer: previewInvoice.customer || previewInvoice.customerName || '',
-      phone,
-      whatsapp: phone,
-      cnic: previewInvoice.cnic || '',
-      address: previewInvoice.address || '',
-      items: (previewInvoice.items || []).map((item) => ({ name: item.name || '' })),
+    const invoice = previewInvoice;
+    if (!(invoice.items || []).length || invoice.items.some((item) => !item.productId && !item.id)) {
+      showAlert('Invoice cannot be opened in New Sale', 'This invoice has custom items without linked products, so its inventory cannot be safely updated.', 'warning');
+      return;
+    }
+    const invoiceNo = invoice.invoiceNo || invoice.id;
+    const planRecord = (data.installmentPlans || []).find((item) => item.invoiceNo === invoiceNo);
+    const details = planRecord?.installmentDetails || {};
+    const invoiceCustomer = (data.customers || []).find((item) => String(item.id) === String(invoice.customerId));
+    const phone = invoice.whatsapp || invoice.phone || invoiceCustomer?.whatsapp || invoiceCustomer?.phone || '';
+    const customer = {
+      ...(invoiceCustomer || {}),
+      ...(details.customer || {}),
+      name: invoice.customer || invoice.customerName || '', phone,
+      whatsapp: phone, cnic: invoice.cnic || details.customer?.cnic || '',
+      address: invoice.address || details.customer?.address || '',
+      guarantor: invoice.guarantor || details.guarantor?.name || '',
+      guarantorPhone: invoice.guarantorPhone || details.guarantor?.phone || '',
+      guarantorAddress: invoice.guarantorAddress || details.guarantor?.address || '',
+      guarantorCnic: invoice.guarantorCnic || details.guarantor?.cnic || '',
+      customerPhoto: details.customer?.photoDataUrl || '',
+      guarantorPhoto: details.guarantor?.photoDataUrl || '',
+    };
+    setEditingInvoice({ ...invoice, invoiceNo, items: invoice.items || [] });
+    setCustomerId(invoice.customerId && invoice.customerId !== 'walkin' ? invoice.customerId : 'walkin');
+    setCustomerInfo(customer);
+    setSalePhone(phone);
+    setSaleCnic(customer.cnic);
+    setSaleAddress(customer.address);
+    setSalePadNo(invoice.padNo || '');
+    setCart((invoice.items || []).map((item) => {
+      const product = (data.products || []).find((entry) => String(entry.id) === String(item.productId || item.id));
+      return { ...item, id: item.productId || item.id, productId: item.productId || item.id, stock: product?.stock || 0 };
+    }));
+    setBillDiscount(num(invoice.billDiscount));
+    setSaleType(invoice.type || 'cash');
+    setPlan({
+      months: num(planRecord?.months || details.plan?.months || invoice.months || 12),
+      advance: num(planRecord?.advancePaid ?? invoice.initialPaid ?? invoice.paid),
+      percent: num(planRecord?.installmentPercent ?? details.plan?.installmentPercent ?? invoice.installmentPercent ?? 10),
     });
+    setSalePayment({
+      method: invoice.paymentDetails?.method || 'cash',
+      cash: String(invoice.paymentDetails?.cash ?? invoice.cashCollected ?? invoice.initialPaid ?? 0),
+      bank: String(invoice.paymentDetails?.bank ?? invoice.bankCollected ?? 0),
+      bankName: invoice.paymentDetails?.bankName || '',
+      bankAccount: invoice.paymentDetails?.bankAccount || '',
+    });
+    setResumedHeldOrderId('');
+    saleRequestKey.current = '';
+    setProductSearch('');
+    setPreviewInvoice(null);
+    setWhatsAppShareInfo(null);
+    setPage('sale');
+    window.scrollTo(0, 0);
   }
 
-  async function saveInvoiceEdit(event) {
-    event.preventDefault();
-    if (!invoiceEditDraft || savingInvoiceEdit) return;
-    setSavingInvoiceEdit(true);
-    try {
-      const result = await apiRequest(`/sales/${encodeURIComponent(invoiceEditDraft.invoiceNo)}`, {
-        method: 'PUT',
-        body: invoiceEditDraft,
-      });
-      setPreviewInvoice((current) => current ? { ...current, ...result.sale } : current);
-      setInvoiceEditDraft(null);
-      setWhatsAppShareInfo(null);
-      try {
-        await refreshWorkspace();
-        notify(`Invoice ${invoiceEditDraft.invoiceNo} updated.`);
-      } catch {
-        notify(`Invoice ${invoiceEditDraft.invoiceNo} updated. Reload to refresh the workspace.`);
-      }
-    } catch (error) {
-      showAlert('Invoice could not be updated', error.message || 'Please try again.', 'warning');
-    } finally {
-      setSavingInvoiceEdit(false);
-    }
+  function cancelInvoiceEdit() {
+    setEditingInvoice(null);
+    setCart([]); setCustomerId('walkin'); setCustomerInfo(null);
+    setSalePhone(''); setSaleCnic(''); setSaleAddress(''); setSalePadNo('');
+    setSaleType('cash'); setPlan({ months: 12, advance: 15000, percent: 10 });
+    setSalePayment({ method: 'cash', cash: '0', bank: '0', bankName: '', bankAccount: '' });
+    setBillDiscount(0); setResumedHeldOrderId(''); saleRequestKey.current = '';
+    setPage('bills');
   }
 
   async function sendInvoicePdfDirectly() {
@@ -887,7 +926,7 @@ export default function App() {
     group.pages.some(([pageKey]) => pageKey === page)
   );
 
-  const newSalePageContext = { data, page, cart, setCart, customerId, setCustomerId, salePhone, setSalePhone, saleCnic, setSaleCnic, saleAddress, setSaleAddress, salePadNo, setSalePadNo, customerInfo, setCustomerInfo, billDiscount, setBillDiscount, saleType, setSaleType, plan, setPlan, salePayment, setSalePayment, resumedHeldOrderId, setResumedHeldOrderId, productSearch, setProductSearch, setSelectedSearchProductId, newQty, setNewQty, newPrice, setNewPrice, showSuggestions, setShowSuggestions, savingSale, setShowInstallmentCustomerModal, setShowNewCustomerModal, setEditingCustomerRecord, showAlert, gross, appliedDiscount, discounted, add, finalTotal, resetSaleAmounts, cashRec, advanceOrPaid, remainingBalance, excessPayment, monthlyInstallment, handleAddItemToCart, updateCartItemField, handleHoldBill, handleSaveSale, dateText, matchingSearchProducts };
+  const newSalePageContext = { data, page, cart, setCart, customerId, setCustomerId, salePhone, setSalePhone, saleCnic, setSaleCnic, saleAddress, setSaleAddress, salePadNo, setSalePadNo, customerInfo, setCustomerInfo, billDiscount, setBillDiscount, saleType, setSaleType, plan, setPlan, salePayment, setSalePayment, resumedHeldOrderId, setResumedHeldOrderId, editingInvoice, cancelInvoiceEdit, productSearch, setProductSearch, setSelectedSearchProductId, newQty, setNewQty, newPrice, setNewPrice, showSuggestions, setShowSuggestions, savingSale, setShowInstallmentCustomerModal, setShowNewCustomerModal, setEditingCustomerRecord, showAlert, gross, appliedDiscount, discounted, add, finalTotal, resetSaleAmounts, cashRec, advanceOrPaid, remainingBalance, excessPayment, monthlyInstallment, handleAddItemToCart, updateCartItemField, handleHoldBill, handleSaveSale, dateText, matchingSearchProducts };
   const dashboardPageContext = { data, page, setPage, dashPeriod, setDashPeriod, dashDate, setDashDate, showAlert };
   const installmentKhataPageContext = { data, page, plan, khataSearch, setKhataSearch, setShowAddInstallmentModal, setActiveKhataPlan, setKhataPayAmount, dateText, refreshWorkspace, showAlert, notify };
   const stockProductsPageContext = { optionalWarrantyValue, data, page, setPage, inventorySearch, setInventorySearch, inventoryChip, setInventoryChip, stockTab, setStockTab, setEditingProduct, setShowProductModal, showAlert, refreshWorkspace, notify };
@@ -2168,7 +2207,6 @@ export default function App() {
           className="modal-backdrop invoice-preview-backdrop"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
-              setInvoiceEditDraft(null);
               setPreviewInvoice(null);
             }
           }}
@@ -2176,47 +2214,26 @@ export default function App() {
           <div className="modal" role="dialog" aria-modal="true">
             <div className="modal-head">
               <div>
-                <h2>{invoiceEditDraft ? 'Edit Invoice' : previewInvoice.type === 'installment' ? 'Installment Invoice' : 'Sales Invoice'} · {previewInvoice.invoiceNo || previewInvoice.id}</h2>
-                <p>{invoiceEditDraft ? 'Customer details and item descriptions' : `${previewInvoice.customer} · ${shopName}`}</p>
+                <h2>{previewInvoice.type === 'installment' ? 'Installment Invoice' : 'Sales Invoice'} · {previewInvoice.invoiceNo || previewInvoice.id}</h2>
+                <p>{`${previewInvoice.customer} · ${shopName}`}</p>
               </div>
               <button
                 type="button"
                 className="icon-btn"
-                onClick={() => { setInvoiceEditDraft(null); setPreviewInvoice(null); }}
+                onClick={() => setPreviewInvoice(null)}
               >
                 ×
               </button>
             </div>
             <div className="modal-body">
-              {invoiceEditDraft ? (
-                <form id="invoice-edit-form" className="fields" onSubmit={saveInvoiceEdit}>
-                  <div className="modal-note field full" style={{ marginTop: 0 }}>
-                    You can edit customer details, pad number, and item descriptions. Quantities, prices, totals, stock, and payment history stay unchanged.
-                  </div>
-                  <label className="field">Customer name<input required maxLength={120} value={invoiceEditDraft.customer} onChange={(event) => setInvoiceEditDraft((current) => ({ ...current, customer: event.target.value }))} /></label>
-                  <label className="field">Customer phone / WhatsApp<input maxLength={120} value={invoiceEditDraft.phone} onChange={(event) => setInvoiceEditDraft((current) => ({ ...current, phone: event.target.value, whatsapp: event.target.value }))} /></label>
-                  <label className="field">Customer ID / CNIC<input maxLength={120} value={invoiceEditDraft.cnic} onChange={(event) => setInvoiceEditDraft((current) => ({ ...current, cnic: event.target.value }))} /></label>
-                  <label className="field">Pad number<input maxLength={40} value={invoiceEditDraft.padNo} onChange={(event) => setInvoiceEditDraft((current) => ({ ...current, padNo: event.target.value }))} /></label>
-                  <label className="field full">Address<input maxLength={300} value={invoiceEditDraft.address} onChange={(event) => setInvoiceEditDraft((current) => ({ ...current, address: event.target.value }))} /></label>
-                  {invoiceEditDraft.items.map((item, index) => (
-                    <label className="field full" key={`invoice-edit-item-${index}`}>Item description {index + 1}<input required maxLength={180} value={item.name} onChange={(event) => setInvoiceEditDraft((current) => ({ ...current, items: current.items.map((line, lineIndex) => lineIndex === index ? { ...line, name: event.target.value } : line) }))} /></label>
-                  ))}
-                </form>
-              ) : (
-                <div className="ci-preview-host">
-                  {previewInvoice.type === 'installment'
-                    ? <InstallmentInvoiceA5 invoice={invoiceModel} />
-                    : <SalesInvoiceA5 invoice={invoiceModel} />}
-                </div>
-              )}
+              <div className="ci-preview-host">
+                {previewInvoice.type === 'installment'
+                  ? <InstallmentInvoiceA5 invoice={invoiceModel} />
+                  : <SalesInvoiceA5 invoice={invoiceModel} />}
+              </div>
             </div>
             <div className="modal-actions">
-              {invoiceEditDraft ? (
-                <>
-                  <button type="button" className="btn ghost" onClick={() => setInvoiceEditDraft(null)} disabled={savingInvoiceEdit}>Cancel</button>
-                  <button type="submit" className="btn" form="invoice-edit-form" disabled={savingInvoiceEdit}>{savingInvoiceEdit ? 'Saving…' : 'Save Changes'}</button>
-                </>
-              ) : <>
+              <>
                 <button type="button" className="btn ghost" onClick={() => setPreviewInvoice(null)}>Close</button>
                 <button type="button" className="btn secondary" onClick={beginInvoiceEdit}>Edit Invoice</button>
                 {previewInvoice.onReceiveDue && (
@@ -2247,7 +2264,7 @@ export default function App() {
               >
                 {sendingWhatsAppInvoice ? 'Sending…' : 'WhatsApp PDF Invoice'}
               </button>
-              </>}
+              </>
             </div>
           </div>
         </div>

@@ -17,12 +17,12 @@ import {
 import { apiRequest, money, num } from '../../api.js';
 
 export default function NewSalePage({ app }) {
-  const { data, page, cart, setCart, setResumedHeldOrderId, customerId, setCustomerId, salePhone, setSalePhone, saleCnic, setSaleCnic, saleAddress, setSaleAddress, salePadNo, setSalePadNo, customerInfo, setCustomerInfo, billDiscount, setBillDiscount, saleType, setSaleType, plan, setPlan, salePayment, setSalePayment, productSearch, setProductSearch, setSelectedSearchProductId, newQty, setNewQty, newPrice, setNewPrice, showSuggestions, setShowSuggestions, savingSale, setShowInstallmentCustomerModal, setShowNewCustomerModal, setEditingCustomerRecord, showAlert, gross, appliedDiscount, discounted, add, finalTotal, resetSaleAmounts, cashRec, advanceOrPaid, remainingBalance, excessPayment, monthlyInstallment, handleAddItemToCart, updateCartItemField, handleHoldBill, handleSaveSale, dateText, matchingSearchProducts } = app;
+  const { data, page, cart, setCart, setResumedHeldOrderId, customerId, setCustomerId, salePhone, setSalePhone, saleCnic, setSaleCnic, saleAddress, setSaleAddress, salePadNo, setSalePadNo, customerInfo, setCustomerInfo, billDiscount, setBillDiscount, saleType, setSaleType, plan, setPlan, salePayment, setSalePayment, productSearch, setProductSearch, setSelectedSearchProductId, newQty, setNewQty, newPrice, setNewPrice, showSuggestions, setShowSuggestions, savingSale, setShowInstallmentCustomerModal, setShowNewCustomerModal, setEditingCustomerRecord, showAlert, gross, appliedDiscount, discounted, add, finalTotal, resetSaleAmounts, cashRec, advanceOrPaid, remainingBalance, excessPayment, monthlyInstallment, handleAddItemToCart, updateCartItemField, handleHoldBill, handleSaveSale, dateText, matchingSearchProducts, editingInvoice, cancelInvoiceEdit } = app;
   return (
               <>
                 <div className="page-head">
                   <div>
-                    <h1>New Sale</h1>
+                    <h1>{editingInvoice ? `Edit Invoice ${editingInvoice.invoiceNo}` : 'New Sale'}</h1>
                   </div>
                 </div>
 
@@ -32,7 +32,7 @@ export default function NewSalePage({ app }) {
                     <section className="card">
                       <div className="card-head">
                         <h2>Customer & Invoice</h2>
-                        <span className="tag">NEW BILL · {dateText}</span>
+                        <span className="tag">{editingInvoice ? `EDITING ${editingInvoice.invoiceNo}` : `NEW BILL · ${dateText}`}</span>
                       </div>
                       <div className="fields">
                         <label className="field full">
@@ -541,9 +541,7 @@ export default function NewSalePage({ app }) {
                     )}
 
                     <div className="actions">
-                      <button type="button" className="btn ghost" onClick={handleHoldBill}>
-                        Hold bill
-                      </button>
+                      {!editingInvoice && <button type="button" className="btn ghost" onClick={handleHoldBill}>Hold bill</button>}
                       <button
                         type="button"
                         className="btn secondary"
@@ -573,8 +571,9 @@ export default function NewSalePage({ app }) {
                         disabled={savingSale}
                         onClick={handleSaveSale}
                       >
-                        {savingSale ? 'Saving...' : 'Save & Preview Invoice →'}
+                        {savingSale ? (editingInvoice ? 'Updating...' : 'Saving...') : (editingInvoice ? 'Update Invoice' : 'Save & Preview Invoice →')}
                       </button>
+                      {editingInvoice && <button type="button" className="btn ghost" onClick={cancelInvoiceEdit} disabled={savingSale}>Cancel Edit</button>}
                     </div>
                   </section>
                 </div>
