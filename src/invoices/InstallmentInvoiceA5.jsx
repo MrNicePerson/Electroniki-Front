@@ -7,7 +7,6 @@ import { CustomerBlock, ItemsTable, SummaryTable, Terms, Signature, InvoicePage,
 /** A5 installment invoice using the advance, balance, and plan saved with the sale. */
 export default function InstallmentInvoiceA5({ invoice }) {
   if (!invoice) return null;
-  const pageCount = invoicePageCount(invoice.items);
   const balance = Math.max(0, Number(invoice.balance) || 0);
   const schedule = createInstallmentSchedule(balance, invoice.months, invoice.monthly);
   const plan = schedule.regularAmount === schedule.finalAmount
@@ -23,13 +22,16 @@ export default function InstallmentInvoiceA5({ invoice }) {
     ['Payment Method', invoice.paymentMethod, true],
     ...(invoice.paymentMethod === 'Bank' && invoice.bankName ? [['Bank', invoice.bankName]] : []),
   ];
-  const tableHeight = Math.max(48, 65 - Math.max(0, rows.length - 5) * 7);
+  const itemsPerPage = rows.length >= 8 ? 3 : rows.length === 7 ? 4 : 5;
+  const pageCount = invoicePageCount(invoice.items, itemsPerPage);
   return Array.from({ length: pageCount }, (_, pageIndex) => {
     const lastPage = pageIndex === pageCount - 1;
+    const pageItems = invoice.items.slice(pageIndex * itemsPerPage, (pageIndex + 1) * itemsPerPage);
+    const tableHeight = 7 + pageItems.length * 7.5;
     return (
       <InvoicePage key={pageIndex} title="INSTALLMENT INVOICE" invoice={invoice} lastPage={lastPage} variant="installment" tableHeight={tableHeight} pageNumber={pageIndex + 1} pageCount={pageCount} showPaidStamp={lastPage && invoice.balance <= 0}>
         <CustomerBlock data={invoice} />
-        <ItemsTable items={invoice.items.slice(pageIndex * 10, (pageIndex + 1) * 10)} startIndex={pageIndex * 10} />
+        <ItemsTable items={pageItems} startIndex={pageIndex * itemsPerPage} />
         {lastPage ? <>
           <div className="ci-bottom ci-installment-bottom">
             <SummaryTable rows={rows} />

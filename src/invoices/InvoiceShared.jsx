@@ -53,7 +53,7 @@ export function CustomerBlock({ data }) {
 }
 
 export function ItemsTable({ items = [], startIndex = 0 }) {
-  const rows = [...items, ...Array(Math.max(0, 10 - items.length)).fill(null)];
+  const rows = items;
   return (
     <table className="ci-items">
       <thead><tr><th>#</th><th>Item Description</th><th>Qty</th><th>Rate (Rs.)</th><th>Amount (Rs.)</th></tr></thead>
@@ -112,8 +112,8 @@ export function InvoicePage({ title, invoice, children, lastPage = true, variant
   return <article className={`ci-page ci-${variant} ci-theme-${theme}${lastPage ? ' ci-last-page' : ''}`} style={{ '--ci-items-height': `${tableHeight}mm`, '--ci-brand': accent }}><InvoiceHeader title={title} shop={invoice.shop} />{children}{showPaidStamp && <PaidStamp />}<footer className="ci-page-footer"><span>Software by Crown Software House | 03197794021</span><span>Page {pageNumber} of {pageCount}</span></footer></article>;
 }
 
-export function invoicePageCount(items = []) {
-  return Math.max(1, Math.ceil(items.length / 10));
+export function invoicePageCount(items = [], pageSize = 10) {
+  return Math.max(1, Math.ceil(items.length / pageSize));
 }
 
 export { money };

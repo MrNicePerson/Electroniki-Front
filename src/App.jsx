@@ -332,6 +332,8 @@ export default function App() {
   const [showNewCustomerModal, setShowNewCustomerModal] = useState(false);
   const [editingCustomerRecord, setEditingCustomerRecord] = useState(null);
   const [previewInvoice, setPreviewInvoice] = useState(null);
+  const [invoiceEditDraft, setInvoiceEditDraft] = useState(null);
+  const [savingInvoiceEdit, setSavingInvoiceEdit] = useState(false);
   const [whatsAppShareInfo, setWhatsAppShareInfo] = useState(null);
   const [whatsAppRecipientInput, setWhatsAppRecipientInput] = useState('');
   const [sendingWhatsAppInvoice, setSendingWhatsAppInvoice] = useState(false);
@@ -434,6 +436,7 @@ export default function App() {
     setShowNewCustomerModal(false); setEditingCustomerRecord(null);
     setShowInstallmentCustomerModal(false); setShowAddInstallmentModal(false);
     setPreviewInvoice(null);
+    setInvoiceEditDraft(null);
     setWhatsAppShareInfo(null);
     setSidebarOpen(false);
     try {
@@ -733,6 +736,46 @@ export default function App() {
     });
     window.scrollTo(0, 0);
     window.print();
+  }
+
+  function beginInvoiceEdit() {
+    if (!previewInvoice) return;
+    const phone = previewInvoice.whatsapp || previewInvoice.phone || '';
+    setInvoiceEditDraft({
+      invoiceNo: previewInvoice.invoiceNo || previewInvoice.id,
+      padNo: previewInvoice.padNo || '',
+      customer: previewInvoice.customer || previewInvoice.customerName || '',
+      phone,
+      whatsapp: phone,
+      cnic: previewInvoice.cnic || '',
+      address: previewInvoice.address || '',
+      items: (previewInvoice.items || []).map((item) => ({ name: item.name || '' })),
+    });
+  }
+
+  async function saveInvoiceEdit(event) {
+    event.preventDefault();
+    if (!invoiceEditDraft || savingInvoiceEdit) return;
+    setSavingInvoiceEdit(true);
+    try {
+      const result = await apiRequest(`/sales/${encodeURIComponent(invoiceEditDraft.invoiceNo)}`, {
+        method: 'PUT',
+        body: invoiceEditDraft,
+      });
+      setPreviewInvoice((current) => current ? { ...current, ...result.sale } : current);
+      setInvoiceEditDraft(null);
+      setWhatsAppShareInfo(null);
+      try {
+        await refreshWorkspace();
+        notify(`Invoice ${invoiceEditDraft.invoiceNo} updated.`);
+      } catch {
+        notify(`Invoice ${invoiceEditDraft.invoiceNo} updated. Reload to refresh the workspace.`);
+      }
+    } catch (error) {
+      showAlert('Invoice could not be updated', error.message || 'Please try again.', 'warning');
+    } finally {
+      setSavingInvoiceEdit(false);
+    }
   }
 
   async function sendInvoicePdfDirectly() {
@@ -2123,38 +2166,60 @@ export default function App() {
       {previewInvoice && (
         <div
           className="modal-backdrop invoice-preview-backdrop"
-          onClick={(e) => e.target === e.currentTarget && setPreviewInvoice(null)}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setInvoiceEditDraft(null);
+              setPreviewInvoice(null);
+            }
+          }}
         >
           <div className="modal" role="dialog" aria-modal="true">
             <div className="modal-head">
               <div>
-                <h2>{previewInvoice.type === 'installment' ? 'Installment Invoice' : 'Sales Invoice'} · {previewInvoice.invoiceNo || previewInvoice.id}</h2>
-                <p>{previewInvoice.customer} · {shopName}</p>
+                <h2>{invoiceEditDraft ? 'Edit Invoice' : previewInvoice.type === 'installment' ? 'Installment Invoice' : 'Sales Invoice'} · {previewInvoice.invoiceNo || previewInvoice.id}</h2>
+                <p>{invoiceEditDraft ? 'Customer details and item descriptions' : `${previewInvoice.customer} · ${shopName}`}</p>
               </div>
               <button
                 type="button"
                 className="icon-btn"
-                onClick={() => setPreviewInvoice(null)}
+                onClick={() => { setInvoiceEditDraft(null); setPreviewInvoice(null); }}
               >
                 ×
               </button>
             </div>
             <div className="modal-body">
-              <div className="ci-preview-host">
-                {previewInvoice.type === 'installment'
-                  ? <InstallmentInvoiceA5 invoice={invoiceModel} />
-                  : <SalesInvoiceA5 invoice={invoiceModel} />}
-              </div>
+              {invoiceEditDraft ? (
+                <form id="invoice-edit-form" className="fields" onSubmit={saveInvoiceEdit}>
+                  <div className="modal-note field full" style={{ marginTop: 0 }}>
+                    You can edit customer details, pad number, and item descriptions. Quantities, prices, totals, stock, and payment history stay unchanged.
+                  </div>
+                  <label className="field">Customer name<input required maxLength={120} value={invoiceEditDraft.customer} onChange={(event) => setInvoiceEditDraft((current) => ({ ...current, customer: event.target.value }))} /></label>
+                  <label className="field">Customer phone / WhatsApp<input maxLength={120} value={invoiceEditDraft.phone} onChange={(event) => setInvoiceEditDraft((current) => ({ ...current, phone: event.target.value, whatsapp: event.target.value }))} /></label>
+                  <label className="field">Customer ID / CNIC<input maxLength={120} value={invoiceEditDraft.cnic} onChange={(event) => setInvoiceEditDraft((current) => ({ ...current, cnic: event.target.value }))} /></label>
+                  <label className="field">Pad number<input maxLength={40} value={invoiceEditDraft.padNo} onChange={(event) => setInvoiceEditDraft((current) => ({ ...current, padNo: event.target.value }))} /></label>
+                  <label className="field full">Address<input maxLength={300} value={invoiceEditDraft.address} onChange={(event) => setInvoiceEditDraft((current) => ({ ...current, address: event.target.value }))} /></label>
+                  {invoiceEditDraft.items.map((item, index) => (
+                    <label className="field full" key={`invoice-edit-item-${index}`}>Item description {index + 1}<input required maxLength={180} value={item.name} onChange={(event) => setInvoiceEditDraft((current) => ({ ...current, items: current.items.map((line, lineIndex) => lineIndex === index ? { ...line, name: event.target.value } : line) }))} /></label>
+                  ))}
+                </form>
+              ) : (
+                <div className="ci-preview-host">
+                  {previewInvoice.type === 'installment'
+                    ? <InstallmentInvoiceA5 invoice={invoiceModel} />
+                    : <SalesInvoiceA5 invoice={invoiceModel} />}
+                </div>
+              )}
             </div>
             <div className="modal-actions">
-              <button
-                type="button"
-                className="btn ghost"
-                onClick={() => setPreviewInvoice(null)}
-              >
-                Close
-              </button>
-              {previewInvoice.onReceiveDue && (
+              {invoiceEditDraft ? (
+                <>
+                  <button type="button" className="btn ghost" onClick={() => setInvoiceEditDraft(null)} disabled={savingInvoiceEdit}>Cancel</button>
+                  <button type="submit" className="btn" form="invoice-edit-form" disabled={savingInvoiceEdit}>{savingInvoiceEdit ? 'Saving…' : 'Save Changes'}</button>
+                </>
+              ) : <>
+                <button type="button" className="btn ghost" onClick={() => setPreviewInvoice(null)}>Close</button>
+                <button type="button" className="btn secondary" onClick={beginInvoiceEdit}>Edit Invoice</button>
+                {previewInvoice.onReceiveDue && (
                 <button
                   type="button"
                   className="btn"
@@ -2166,7 +2231,7 @@ export default function App() {
                 >
                   Receive Due
                 </button>
-              )}
+                )}
               <button
                 type="button"
                 className="btn secondary"
@@ -2182,6 +2247,7 @@ export default function App() {
               >
                 {sendingWhatsAppInvoice ? 'Sending…' : 'WhatsApp PDF Invoice'}
               </button>
+              </>}
             </div>
           </div>
         </div>

@@ -6,7 +6,8 @@ import { CustomerBlock, ItemsTable, SummaryTable, Terms, Signature, InvoicePage,
 /** A5 sales invoice. The caller supplies the saved sale and shop settings. */
 export default function SalesInvoiceA5({ invoice }) {
   if (!invoice) return null;
-  const pageCount = invoicePageCount(invoice.items);
+  const itemsPerPage = 7;
+  const pageCount = invoicePageCount(invoice.items, itemsPerPage);
   const rows = [
     ['Subtotal', money(invoice.subtotal)],
     ...(invoice.discount ? [['Discount', `- ${money(invoice.discount)}`]] : []),
@@ -16,13 +17,14 @@ export default function SalesInvoiceA5({ invoice }) {
     ['Payment Method', invoice.paymentMethod, true],
     ...(invoice.paymentMethod.includes('Bank') && invoice.bankName ? [['Bank', invoice.bankName]] : []),
   ];
-  const tableHeight = Math.max(63, 71 - Math.max(0, rows.length - 5) * 4);
   return Array.from({ length: pageCount }, (_, pageIndex) => {
     const lastPage = pageIndex === pageCount - 1;
+    const pageItems = invoice.items.slice(pageIndex * itemsPerPage, (pageIndex + 1) * itemsPerPage);
+    const tableHeight = 6 + pageItems.length * 5.7;
     return (
       <InvoicePage key={pageIndex} title="SALES INVOICE" invoice={invoice} lastPage={lastPage} variant="sales" tableHeight={tableHeight} pageNumber={pageIndex + 1} pageCount={pageCount} showPaidStamp={lastPage && invoice.balance <= 0}>
         <CustomerBlock data={invoice} />
-        <ItemsTable items={invoice.items.slice(pageIndex * 10, (pageIndex + 1) * 10)} startIndex={pageIndex * 10} />
+        <ItemsTable items={pageItems} startIndex={pageIndex * itemsPerPage} />
         {lastPage ? <>
           <div className="ci-bottom ci-sales-bottom">
             <SummaryTable rows={rows} />
