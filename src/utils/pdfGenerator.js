@@ -287,7 +287,28 @@ export function buildWhatsAppInvoiceShare(sale, shop) {
   const shopName = shop?.name || 'Electronics Shop';
   const shopWa = shop?.whatsapp || shop?.phone || '';
   const invoiceNo = sale.invoiceNo || sale.id;
-  const customerPhone = [sale.whatsapp, sale.phone]
+  const customerPhoneInput = [
+    sale.customerWhatsapp,
+    sale.customerPhone,
+    sale.phone,
+    sale.whatsapp,
+    sale.customerRecord?.customerWhatsapp,
+    sale.customerRecord?.customerPhone,
+    sale.customerRecord?.phone,
+    sale.customerRecord?.whatsapp,
+  ]
+    .map((value) => String(value || '').trim())
+    .find(Boolean) || '';
+  const customerPhone = [
+    sale.customerWhatsapp,
+    sale.customerPhone,
+    sale.phone,
+    sale.whatsapp,
+    sale.customerRecord?.customerWhatsapp,
+    sale.customerRecord?.customerPhone,
+    sale.customerRecord?.phone,
+    sale.customerRecord?.whatsapp,
+  ]
     .map(normalizeWhatsAppPhone)
     .find((phone) => /^923\d{9}$/.test(phone)) || '';
 
@@ -312,6 +333,7 @@ export function buildWhatsAppInvoiceShare(sale, shop) {
   return {
     text,
     targetPhone,
+    customerPhoneInput,
     shopWhatsApp: shopWa,
   };
 }
