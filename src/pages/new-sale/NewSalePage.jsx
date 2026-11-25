@@ -405,9 +405,9 @@ export default function NewSalePage({ app }) {
                           id="billDiscount"
                           type="text"
                           min="0"
-                          value={billDiscount}
+                          value={billDiscount > 0 ? billDiscount : ''}
                           onChange={(e) => setBillDiscount(num(e.target.value))}
-                          placeholder="Enter discount amount"
+                          placeholder="Enter amount"
                           aria-label="Discount amount in rupees"
                         />
                       </div>

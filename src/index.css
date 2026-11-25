@@ -912,15 +912,23 @@ textarea:focus-visible {
   font-weight: 700;
 }
 
-.discount-row input[type="number"] {
-  width: 120px;
-  height: 34px;
+.discount-row input {
+  width: min(180px, 55%);
+  min-width: 120px;
+  height: 38px;
   border: 1px solid #dce6eb;
   border-radius: 8px;
   padding: 0 9px;
   text-align: right;
   color: #2b5065;
   font-size: 13px;
+}
+
+.discount-row input::placeholder {
+  color: #8193a0;
+  opacity: 1;
+  text-align: left;
+  font-size: 12px;
 }
 
 .sale-type {
