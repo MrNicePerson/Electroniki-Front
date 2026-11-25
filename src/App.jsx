@@ -776,7 +776,8 @@ export default function App() {
         setWhatsAppShareInfo(null);
         return;
       }
-      const whatsappTab = window.open('https://web.whatsapp.com/', '_blank', 'noopener,noreferrer');
+      const whatsappTab = window.open('https://web.whatsapp.com/', '_blank');
+      if (whatsappTab) whatsappTab.opener = null;
       downloadInvoicePdfBlob(blob, fileName || 'invoice.pdf');
       if (!whatsappTab) showAlert('WhatsApp opened', 'Your browser blocked the new tab. Open web.whatsapp.com and attach the downloaded PDF.', 'warning');
     } catch (error) {
