@@ -13,17 +13,17 @@
 .ci-continuation { margin-top:2mm; padding:2mm; border:1px dashed var(--ci-line); color:#536b7a; font-size:7.5pt; text-align:right; }
 .ci-installment-bottom .ci-summary-row { min-height:6.2mm; font-size:7.2pt; }
 .ci-sales-bottom{grid-template-columns:1fr}.ci-sales-right-stack:empty{display:none}.ci-sales-bottom .ci-summary-row{min-height:7mm;padding:0.7mm 2.5mm}.ci-sales-bottom .ci-summary h3{padding:1.2mm 2.5mm}
-.ci-customer.is-installment{height:29mm;grid-template-rows:repeat(5,minmax(0,1fr))}.ci-installment .ci-plan>div{white-space:normal;flex-direction:column;gap:.8mm}.ci-installment .ci-plan>div small{font-size:6.5pt;font-weight:650}
+.ci-customer.is-installment{height:32mm;grid-template-rows:repeat(5,minmax(0,1fr))}.ci-installment .ci-plan>div{white-space:normal;flex-direction:column;gap:.8mm}.ci-installment .ci-plan>div small{font-size:6.5pt;font-weight:650}
 
 /* Climax A5 invoice reference styling */
 .ci-page{border:1px solid #1672c8;padding:4.5mm 4.5mm 4mm;font-family:"Arial Narrow",Arial,sans-serif;color:#101820}
 .ci-header{grid-template-columns:24mm 32mm minmax(0,1fr) 18mm;grid-template-rows:16mm 7mm;column-gap:1mm;height:24mm;padding:0 1mm 1mm;border-bottom:1px solid #70b2ee}
 .ci-appliance-art{grid-column:1;grid-row:1;width:24mm;height:21mm;align-self:center}
 .ci-fan-art{grid-column:2;grid-row:1;width:32mm;height:22mm;align-self:center}
-.ci-brand-copy{grid-column:3;grid-row:1/3;align-self:center;text-align:center;line-height:1;min-width:0}
-.ci-shop-name{font-size:32pt;font-weight:900;letter-spacing:.25px;color:#064b89;white-space:nowrap;overflow:hidden;text-overflow:clip}
-.ci-shop-subtitle{margin-top:.5mm;font-size:10pt;font-weight:800;letter-spacing:2.1px;color:#111820;white-space:nowrap;overflow:hidden;text-overflow:clip}
-.ci-contact-row{display:flex;justify-content:center;align-items:center;gap:2mm;margin-top:1.1mm;font-size:7.8pt;white-space:nowrap}
+.ci-brand-copy{grid-column:3;grid-row:1/3;align-self:center;text-align:center;line-height:1.15;min-width:0}
+.ci-shop-name{font-size:32pt;line-height:1.1;font-weight:900;letter-spacing:.25px;color:#064b89;white-space:nowrap;overflow:hidden;text-overflow:clip}
+.ci-shop-subtitle{margin-top:.5mm;font-size:10pt;line-height:1.25;font-weight:800;letter-spacing:2.1px;color:#111820;white-space:nowrap;overflow:hidden;text-overflow:clip}
+.ci-contact-row{display:flex;justify-content:center;align-items:center;gap:2mm;margin-top:1.1mm;font-size:7.8pt;line-height:1.2;white-space:nowrap}
 .ci-contact-row span{display:inline-flex;align-items:center;gap:1mm}
 .ci-contact-row svg{width:3mm;height:3mm;fill:#073f78;color:#073f78;stroke:#fff;stroke-width:2.4}
 .ci-contact-row i{height:4mm;border-left:1px solid #59758f}
@@ -41,7 +41,7 @@
 .ci-customer-row{display:grid;grid-template-columns:29mm minmax(0,1fr) 12mm 27mm;align-items:center;gap:1mm;min-width:0}
 .ci-customer>div.ci-customer-row{grid-template-columns:29mm minmax(0,1fr) 12mm 27mm}
 .ci-customer-row b{font-size:8pt;font-weight:700}
-.ci-customer-row strong{min-width:0;min-height:4mm;padding:0 1mm;border:0;border-bottom:1px solid #64a5df;font-size:8.3pt;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ci-customer-row strong{display:flex;align-items:center;min-width:0;height:100%;min-height:0;padding:0 1mm;border:0;border-bottom:1px solid #64a5df;font-size:8.3pt;line-height:1.2;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ci-customer-row .ci-invoice-number{display:inline-flex;align-items:center;min-height:6mm;border:0;border-radius:1.4mm;background:#d4eaff;color:#102434;font-size:10pt;font-weight:900}
 .ci-customer-row .ci-invoice-number small{margin-left:3mm;font-size:7pt;font-weight:900;color:#263f52;white-space:nowrap}
 .ci-customer-row .ci-date-label{grid-column:3}
