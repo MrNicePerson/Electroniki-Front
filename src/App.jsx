@@ -19,7 +19,7 @@ import {
   Download,
 } from 'lucide-react';
 import { apiRequest, setSessionToken, money, num } from './api.js';
-import { blobToDataUrl, buildWhatsAppInvoiceShare, createInvoiceElementPdf, downloadInvoiceElementPdf, downloadInvoicePdfBlob, normalizeWhatsAppPhone } from './utils/pdfGenerator.js';
+import { blobToDataUrl, buildWhatsAppInvoiceShare, createInvoiceElementPdf, downloadInvoicePdfBlob, normalizeWhatsAppPhone } from './utils/pdfGenerator.js';
 import SalesInvoiceA5 from './invoices/SalesInvoiceA5.jsx';
 import InstallmentInvoiceA5 from './invoices/InstallmentInvoiceA5.jsx';
 import { toInvoiceModel } from './invoices/invoiceData.js';
@@ -700,25 +700,11 @@ export default function App() {
     try {
       const invoiceElement = document.querySelector('.invoice-preview-backdrop .ci-preview-host');
       const pdf = await createInvoiceElementPdf(invoiceElement, fileName);
-      const customerRecord = data.customers.find((customer) => String(customer.id) === String(bill.customerId)) || {};
+      const customerRecord = (data.customers || []).find((customer) => String(customer.id) === String(bill.customerId)) || {};
       const share = buildWhatsAppInvoiceShare({ ...bill, customerRecord }, data.shop);
       generatedShare = { bill, fileName, blob: pdf.blob, ...share };
       setWhatsAppRecipientInput(share.customerPhoneInput);
-      if (!share.targetPhone) {
-        setWhatsAppShareInfo(generatedShare);
-        return;
-      }
-      await apiRequest('/whatsapp/invoice-document', {
-        method: 'POST',
-        body: {
-          invoiceNo: bill.invoiceNo,
-          to: share.targetPhone,
-          fileName,
-          pdfDataUrl: await blobToDataUrl(pdf.blob),
-          caption: share.text,
-        },
-      });
-      showAlert('Invoice sent', `Invoice ${bill.invoiceNo || ''} PDF was sent to the customer's WhatsApp number.`, 'success');
+      setWhatsAppShareInfo(generatedShare);
     } catch (error) {
       if (generatedShare) {
         setWhatsAppRecipientInput(generatedShare.customerPhoneInput || generatedShare.targetPhone || '');
@@ -749,23 +735,11 @@ export default function App() {
     window.print();
   }
 
-  async function downloadSharedInvoiceAgain() {
-    try {
-      if (whatsAppShareInfo?.blob) downloadInvoicePdfBlob(whatsAppShareInfo.blob, whatsAppShareInfo.fileName || 'invoice.pdf');
-      else {
-        const invoiceElement = document.querySelector('.invoice-preview-backdrop .ci-preview-host');
-        await downloadInvoiceElementPdf(invoiceElement, whatsAppShareInfo?.fileName || 'invoice.pdf');
-      }
-    } catch (error) {
-      showAlert('Could not create invoice PDF', error?.message || 'Please try again.', 'warning');
-    }
-  }
-
   async function sendInvoicePdfDirectly() {
     if (!whatsAppShareInfo?.blob || sendingWhatsAppInvoiceRef.current) return;
     const recipient = normalizeWhatsAppPhone(whatsAppRecipientInput);
-    if (!/^923\d{9}$/.test(recipient)) {
-      showAlert('Enter a valid customer WhatsApp number', 'Use a Pakistani mobile number such as 03XXXXXXXXX or +923XXXXXXXXX.', 'warning');
+    if (!/^\d{7,15}$/.test(recipient)) {
+      showAlert('Enter a valid WhatsApp number', 'Include the country code for international numbers, or use a Pakistani mobile such as 03XXXXXXXXX.', 'warning');
       return;
     }
     sendingWhatsAppInvoiceRef.current = true;
@@ -793,8 +767,23 @@ export default function App() {
   }
 
   async function openWhatsAppForInvoice() {
-    if (!whatsAppShareInfo) return;
-    await sendInvoicePdfDirectly();
+    if (!whatsAppShareInfo?.blob) return;
+    const { blob, fileName, text } = whatsAppShareInfo;
+    try {
+      const pdfFile = typeof File === 'function' ? new File([blob], fileName || 'invoice.pdf', { type: 'application/pdf' }) : null;
+      if (pdfFile && typeof navigator.canShare === 'function' && navigator.canShare({ files: [pdfFile] }) && typeof navigator.share === 'function') {
+        await navigator.share({ files: [pdfFile], text });
+        setWhatsAppShareInfo(null);
+        return;
+      }
+      const whatsappTab = window.open('https://web.whatsapp.com/', '_blank', 'noopener,noreferrer');
+      downloadInvoicePdfBlob(blob, fileName || 'invoice.pdf');
+      if (!whatsappTab) showAlert('WhatsApp opened', 'Your browser blocked the new tab. Open web.whatsapp.com and attach the downloaded PDF.', 'warning');
+    } catch (error) {
+      if (error?.name !== 'AbortError') {
+        showAlert('Could not open WhatsApp sharing', error?.message || 'Download the PDF and attach it in WhatsApp.', 'warning');
+      }
+    }
   }
 
   if (authLoading) {
@@ -2223,11 +2212,11 @@ export default function App() {
             </div>
             <div className="modal-body">
               <div className="modal-note" style={{ marginTop: 0 }}>
-                A5 invoice PDF <b>{whatsAppShareInfo.fileName}</b> will be sent through the shop's linked WhatsApp account. {whatsAppShareInfo.targetPhone || whatsAppRecipientInput ? '' : 'This older invoice has no saved WhatsApp number; enter one below.'}
+                A5 invoice PDF <b>{whatsAppShareInfo.fileName}</b> is ready. Send it through the linked shop account, or open WhatsApp to choose any chat.
               </div>
 
               <label className="field" style={{ marginTop: 14 }}>
-                Customer WhatsApp Number
+                WhatsApp Number (optional for Open WhatsApp)
                 <input type="tel" value={whatsAppRecipientInput} onChange={(event) => setWhatsAppRecipientInput(event.target.value)} placeholder="03XXXXXXXXX or +923XXXXXXXXX" />
               </label>
 
@@ -2244,15 +2233,11 @@ export default function App() {
               >
                 Close
               </button>
-              <button
-                type="button"
-                className="btn secondary"
-                onClick={downloadSharedInvoiceAgain}
-              >
-                Download A5 PDF
+              <button type="button" className="btn secondary" onClick={openWhatsAppForInvoice} disabled={sendingWhatsAppInvoice}>
+                Open WhatsApp
               </button>
-              <button type="button" className="btn" onClick={openWhatsAppForInvoice} disabled={!normalizeWhatsAppPhone(whatsAppRecipientInput) || sendingWhatsAppInvoice}>
-                {sendingWhatsAppInvoice ? 'Sending…' : 'Send PDF to customer'}
+              <button type="button" className="btn" onClick={sendInvoicePdfDirectly} disabled={!/^\d{7,15}$/.test(normalizeWhatsAppPhone(whatsAppRecipientInput)) || sendingWhatsAppInvoice}>
+                {sendingWhatsAppInvoice ? 'Sending…' : 'Send PDF Directly'}
               </button>
 
             </div>
