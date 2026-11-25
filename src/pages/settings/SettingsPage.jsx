@@ -348,7 +348,7 @@ export default function SettingsView({ shop = {}, user = {}, users = [], onRefre
                       <b style={{ color: '#12303f' }}>WhatsApp Connection</b>
                       <p className="muted tiny" style={{ margin: '5px 0 10px' }}>
                         Status: <b style={whatsappConnection.connected ? { color: '#14804a' } : undefined}>{whatsappConnection.connected ? 'Connected' : whatsappConnection.status === 'qr_ready' ? 'Waiting for QR scan' : whatsappConnection.status === 'connecting' ? 'Connecting…' : 'Not linked'}</b>
-                        {whatsappConnection.phoneNumber ? <> · Account: <b>+{whatsappConnection.phoneNumber}</b></> : null</p>
+                        {whatsappConnection.phoneNumber && <> &middot; Account: <b>+{whatsappConnection.phoneNumber}</b></>}</p>
                     </div>
                     {whatsappConnection.connected ? (
                       <button type="button" className="btn secondary" disabled={disconnectingWhatsApp} onClick={disconnectWhatsApp}>
