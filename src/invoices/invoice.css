@@ -62,11 +62,13 @@
 .ci-summary-label svg{width:5mm;height:5mm;flex:none;color:#111a20;stroke-width:2.7}
 .ci-percent-icon{display:inline-grid;place-items:center;width:5mm;height:5mm;border:1.4px solid currentColor;border-radius:50%;font-size:7pt;font-weight:900}
 .ci-summary-value{font-size:10pt;font-weight:900!important;white-space:nowrap}
-.ci-installment-bottom .ci-summary-row{min-height:7mm;font-size:7.5pt}
+.ci-installment-bottom .ci-summary-row{min-height:8mm;padding-top:.7mm;padding-bottom:.7mm;font-size:7.5pt}
 .ci-installment .ci-invoice-kind strong{font-size:7.6pt;letter-spacing:-.2px;white-space:nowrap}
 .ci-summary-title-icon svg{width:5mm;height:5mm}
 .ci-installment-bottom{grid-template-columns:1.2fr .8fr}
-.ci-installment .ci-plan>div{font-size:9.5pt;white-space:nowrap}
+.ci-installment .ci-plan>div{font-size:8.2pt;line-height:1.2;white-space:normal;overflow-wrap:anywhere}
+.ci-installment .ci-plan-amount{display:block;max-width:100%;text-align:center;overflow-wrap:anywhere;line-height:1.2}
+.ci-installment .ci-items tbody tr{height:4.8mm}
 .ci-appliance-art,.ci-fan-art{display:block;object-fit:cover;object-position:center;background:#fff;mix-blend-mode:multiply}
 .ci-installment-bottom .ci-summary-value{font-size:9pt}
 .ci-plan h3{font-size:12pt}.ci-plan h3 svg{width:6mm;height:6mm;color:#0757a6;flex:none}
