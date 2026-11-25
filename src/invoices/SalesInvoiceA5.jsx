@@ -16,7 +16,7 @@ export default function SalesInvoiceA5({ invoice }) {
     ['Payment Method', invoice.paymentMethod, true],
     ...(invoice.paymentMethod.includes('Bank') && invoice.bankName ? [['Bank', invoice.bankName]] : []),
   ];
-  const tableHeight = Math.max(55, 77 - Math.max(0, rows.length - 5) * 3);
+  const tableHeight = Math.max(63, 71 - Math.max(0, rows.length - 5) * 4);
   return Array.from({ length: pageCount }, (_, pageIndex) => {
     const lastPage = pageIndex === pageCount - 1;
     return (
