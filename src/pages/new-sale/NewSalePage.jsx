@@ -17,7 +17,7 @@ import {
 import { apiRequest, money, num } from '../../api.js';
 
 export default function NewSalePage({ app }) {
-  const { data, page, cart, setCart, setResumedHeldOrderId, customerId, setCustomerId, salePhone, setSalePhone, saleCnic, setSaleCnic, saleAddress, setSaleAddress, salePadNo, setSalePadNo, customerInfo, setCustomerInfo, billDiscount, setBillDiscount, saleType, setSaleType, plan, setPlan, salePayment, setSalePayment, productSearch, setProductSearch, setSelectedSearchProductId, newQty, setNewQty, newPrice, setNewPrice, showSuggestions, setShowSuggestions, savingSale, setShowInstallmentCustomerModal, setShowNewCustomerModal, setEditingCustomerRecord, showAlert, gross, appliedDiscount, discounted, add, finalTotal, resetSaleAmounts, cashRec, advanceOrPaid, remainingBalance, excessPayment, monthlyInstallment, handleAddItemToCart, updateCartItemField, handleHoldBill, handleSaveSale, dateText, matchingSearchProducts, editingInvoice, cancelInvoiceEdit } = app;
+  const { data, page, cart, setCart, setResumedHeldOrderId, customerId, setCustomerId, saleCustomerName, setSaleCustomerName, salePhone, setSalePhone, saleCnic, setSaleCnic, saleAddress, setSaleAddress, salePadNo, setSalePadNo, customerInfo, setCustomerInfo, billDiscount, setBillDiscount, saleType, setSaleType, plan, setPlan, salePayment, setSalePayment, productSearch, setProductSearch, setSelectedSearchProductId, newQty, setNewQty, newPrice, setNewPrice, showSuggestions, setShowSuggestions, savingSale, setShowInstallmentCustomerModal, setShowNewCustomerModal, setEditingCustomerRecord, showAlert, gross, appliedDiscount, discounted, add, finalTotal, resetSaleAmounts, cashRec, advanceOrPaid, remainingBalance, excessPayment, monthlyInstallment, handleAddItemToCart, updateCartItemField, handleHoldBill, handleSaveSale, dateText, matchingSearchProducts, editingInvoice, cancelInvoiceEdit } = app;
   return (
               <>
                 <div className="page-head">
@@ -36,7 +36,36 @@ export default function NewSalePage({ app }) {
                       </div>
                       <div className="fields">
                         <label className="field full">
-                          Customer / Retailer
+                          Customer name
+                          <input
+                            id="saleCustomerName"
+                            value={saleCustomerName}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setSaleCustomerName(value);
+                              const found = data.customers.find((customer) => customer.name.trim().toLowerCase() === value.trim().toLowerCase());
+                              if (found) {
+                                setCustomerId(found.id);
+                                setCustomerInfo(null);
+                                setSalePhone(found.phone || '');
+                                setSaleCnic(found.cnic || '');
+                                setSaleAddress(found.address || '');
+                              } else {
+                                if (customerId !== 'walkin') {
+                                  setSalePhone('');
+                                  setSaleCnic('');
+                                  setSaleAddress('');
+                                }
+                                setCustomerId('walkin');
+                                setCustomerInfo((current) => current ? { ...current, name: value } : null);
+                              }
+                            }}
+                            placeholder="Type customer name"
+                          />
+                          <small className="muted">Type a new name or choose a saved customer below.</small>
+                        </label>
+                        <label className="field full">
+                          Select saved customer (optional)
                           <select
                             id="customerSelect"
                             value={customerId}
@@ -48,6 +77,7 @@ export default function NewSalePage({ app }) {
                                 return;
                               }
                               setCustomerId(val);
+                              setSaleCustomerName(val === 'walkin' ? 'Walk-in customer' : data.customers.find((c) => c.id === val)?.name || 'Walk-in customer');
                               setCustomerInfo(null);
                               if (val === 'walkin') {
                                 setSalePhone('');

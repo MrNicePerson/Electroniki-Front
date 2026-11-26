@@ -112,6 +112,9 @@ export default function SettingsView({ shop = {}, user = {}, users = [], onRefre
         if (rawValue && !normalized) throw new Error('Enter a valid WhatsApp number or leave the alert number blank.');
         return normalized;
       });
+      if (lowStockAlertsEnabled && !normalizedAlertRecipients.some(Boolean)) {
+        throw new Error('Add at least one valid WhatsApp alert number before enabling low-stock alerts.');
+      }
       await apiRequest('/settings', {
         method: 'PUT',
         body: {
@@ -391,7 +394,7 @@ export default function SettingsView({ shop = {}, user = {}, users = [], onRefre
                     checked={lowStockAlertsEnabled}
                     onChange={(e) => setLowStockAlertsEnabled(e.target.checked)}
                   />
-                  <span><b>Low-stock WhatsApp alerts</b><small className="muted" style={{ display: 'block' }}>Send an alert to both numbers when stock reaches its reorder threshold. It rearms after restocking.</small></span>
+                  <span><b>Low-stock WhatsApp alerts</b><small className="muted" style={{ display: 'block' }}>Send a real WhatsApp message to each configured number when stock reaches its reorder threshold. One or two numbers can be used; duplicate numbers are sent once. It rearms after restocking.</small></span>
                 </label>
                 <div className="fields">
                   <label className="field">

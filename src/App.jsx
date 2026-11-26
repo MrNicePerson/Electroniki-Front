@@ -275,6 +275,7 @@ export default function App() {
   // New Sale State (matching attached UI Redesign)
   const [cart, setCart] = useState([]);
   const [customerId, setCustomerId] = useState('walkin');
+  const [saleCustomerName, setSaleCustomerName] = useState('Walk-in customer');
   const [salePhone, setSalePhone] = useState('');
   const [saleCnic, setSaleCnic] = useState('');
   const [saleAddress, setSaleAddress] = useState('');
@@ -420,6 +421,7 @@ export default function App() {
     setCart([]);
     saleRequestKey.current = '';
     setCustomerId('walkin');
+    setSaleCustomerName('Walk-in customer');
     setCustomerInfo(null);
     setSalePhone(''); setSaleCnic(''); setSaleAddress(''); setSalePadNo('');
     setResumedHeldOrderId('');
@@ -448,7 +450,7 @@ export default function App() {
   // Current selected customer helper
   const selectedCustomerObj =
     customerId === 'walkin' || customerId === 'new'
-      ? { name: 'Walk-in customer', phone: salePhone, whatsapp: '', cnic: saleCnic, address: saleAddress }
+      ? { name: saleCustomerName.trim() || 'Walk-in customer', phone: salePhone, whatsapp: '', cnic: saleCnic, address: saleAddress }
       : data.customers.find((c) => c.id === customerId) || {
           name: 'Walk-in customer',
           phone: salePhone,
@@ -641,7 +643,7 @@ export default function App() {
       showAlert('Cart is empty', 'Add an item to the cart before saving this sale.', 'warning');
       return;
     }
-    if (saleType === 'cash' && customerId === 'walkin' && remainingBalance > 0) {
+    if (saleType === 'cash' && (customerId === 'walkin' && (!saleCustomerName.trim() || saleCustomerName.trim().toLowerCase() === 'walk-in customer')) && remainingBalance > 0) {
       showAlert(
         'Walk-in sale must be paid in full',
         `Collect the remaining Rs. ${remainingBalance.toLocaleString()} before saving. Walk-in sales cannot be left on credit.`,
@@ -664,7 +666,7 @@ export default function App() {
       const salePayload = {
         customerId,
         customerInfo: customerInfo || {
-          name: selectedCustomerObj.name || 'Walk-in customer',
+          name: saleCustomerName.trim() || selectedCustomerObj.name || 'Walk-in customer',
           phone: salePhone || selectedCustomerObj.phone || '',
           whatsapp: selectedCustomerObj.whatsapp || salePhone || selectedCustomerObj.phone || '',
           cnic: saleCnic || selectedCustomerObj.cnic || '',
@@ -775,6 +777,7 @@ export default function App() {
     };
     setEditingInvoice({ ...invoice, invoiceNo, items: invoice.items || [] });
     setCustomerId(invoice.customerId && invoice.customerId !== 'walkin' ? invoice.customerId : 'walkin');
+    setSaleCustomerName(invoice.customer || invoice.customerName || 'Walk-in customer');
     setCustomerInfo(customer);
     setSalePhone(phone);
     setSaleCnic(customer.cnic);
@@ -809,7 +812,7 @@ export default function App() {
 
   function cancelInvoiceEdit() {
     setEditingInvoice(null);
-    setCart([]); setCustomerId('walkin'); setCustomerInfo(null);
+    setCart([]); setCustomerId('walkin'); setSaleCustomerName('Walk-in customer'); setCustomerInfo(null);
     setSalePhone(''); setSaleCnic(''); setSaleAddress(''); setSalePadNo('');
     setSaleType('cash'); setPlan({ months: 12, advance: 15000, percent: 10 });
     setSalePayment({ method: 'cash', cash: '0', bank: '0', bankName: '', bankAccount: '' });
@@ -926,7 +929,7 @@ export default function App() {
     group.pages.some(([pageKey]) => pageKey === page)
   );
 
-  const newSalePageContext = { data, page, cart, setCart, customerId, setCustomerId, salePhone, setSalePhone, saleCnic, setSaleCnic, saleAddress, setSaleAddress, salePadNo, setSalePadNo, customerInfo, setCustomerInfo, billDiscount, setBillDiscount, saleType, setSaleType, plan, setPlan, salePayment, setSalePayment, resumedHeldOrderId, setResumedHeldOrderId, editingInvoice, cancelInvoiceEdit, productSearch, setProductSearch, setSelectedSearchProductId, newQty, setNewQty, newPrice, setNewPrice, showSuggestions, setShowSuggestions, savingSale, setShowInstallmentCustomerModal, setShowNewCustomerModal, setEditingCustomerRecord, showAlert, gross, appliedDiscount, discounted, add, finalTotal, resetSaleAmounts, cashRec, advanceOrPaid, remainingBalance, excessPayment, monthlyInstallment, handleAddItemToCart, updateCartItemField, handleHoldBill, handleSaveSale, dateText, matchingSearchProducts };
+  const newSalePageContext = { data, page, cart, setCart, customerId, setCustomerId, saleCustomerName, setSaleCustomerName, salePhone, setSalePhone, saleCnic, setSaleCnic, saleAddress, setSaleAddress, salePadNo, setSalePadNo, customerInfo, setCustomerInfo, billDiscount, setBillDiscount, saleType, setSaleType, plan, setPlan, salePayment, setSalePayment, resumedHeldOrderId, setResumedHeldOrderId, editingInvoice, cancelInvoiceEdit, productSearch, setProductSearch, setSelectedSearchProductId, newQty, setNewQty, newPrice, setNewPrice, showSuggestions, setShowSuggestions, savingSale, setShowInstallmentCustomerModal, setShowNewCustomerModal, setEditingCustomerRecord, showAlert, gross, appliedDiscount, discounted, add, finalTotal, resetSaleAmounts, cashRec, advanceOrPaid, remainingBalance, excessPayment, monthlyInstallment, handleAddItemToCart, updateCartItemField, handleHoldBill, handleSaveSale, dateText, matchingSearchProducts };
   const dashboardPageContext = { data, page, setPage, dashPeriod, setDashPeriod, dashDate, setDashDate, showAlert };
   const installmentKhataPageContext = { data, page, plan, khataSearch, setKhataSearch, setShowAddInstallmentModal, setActiveKhataPlan, setKhataPayAmount, dateText, refreshWorkspace, showAlert, notify };
   const stockProductsPageContext = { optionalWarrantyValue, data, page, setPage, inventorySearch, setInventorySearch, inventoryChip, setInventoryChip, stockTab, setStockTab, setEditingProduct, setShowProductModal, showAlert, refreshWorkspace, notify };
@@ -1231,6 +1234,7 @@ export default function App() {
                   const restore = () => {
                     setCart(order.cartItems || []);
                     setCustomerId(order.customerId || 'walkin');
+                    setSaleCustomerName(order.customerInfo?.name || order.customerName || 'Walk-in customer');
                     setSalePhone(order.salePhone || order.phone || '');
                     setSaleCnic(order.saleCnic || order.customerInfo?.cnic || '');
                     setSaleAddress(order.saleAddress || order.customerInfo?.address || '');
@@ -1405,6 +1409,7 @@ export default function App() {
                     guarantorCnic: String(fd.get('guarantorCnic') || '').trim(),
                     guarantorPhoto,
                   };
+                  setSaleCustomerName(info.name || 'Walk-in customer');
                   setCustomerInfo(info);
                   setSalePhone(info.phone);
                   setSaleCnic(info.cnic);
@@ -1586,6 +1591,7 @@ export default function App() {
                       body: payload,
                     });
                     setCustomerId(res.customer.id);
+                    setSaleCustomerName(res.customer.name || 'Walk-in customer');
                     setSalePhone(res.customer.phone || '');
                     setSaleCnic(res.customer.cnic || '');
                     setSaleAddress(res.customer.address || '');
