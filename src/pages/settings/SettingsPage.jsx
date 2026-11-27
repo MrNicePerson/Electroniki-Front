@@ -394,7 +394,7 @@ export default function SettingsView({ shop = {}, user = {}, users = [], onRefre
                     checked={lowStockAlertsEnabled}
                     onChange={(e) => setLowStockAlertsEnabled(e.target.checked)}
                   />
-                  <span><b>Low-stock WhatsApp alerts</b><small className="muted" style={{ display: 'block' }}>Send a real WhatsApp message to each configured number when stock reaches its reorder threshold. One or two numbers can be used; duplicate numbers are sent once. It rearms after restocking.</small></span>
+                  <span><b>Low-stock WhatsApp alerts</b><small className="muted" style={{ display: 'block' }}>Send one real WhatsApp stock summary per day at 8:00 AM Pakistan time to each configured number. One or two numbers can be used; duplicate numbers are sent once. Daily summaries stop when all stock recovers.</small></span>
                 </label>
                 <div className="fields">
                   <label className="field">
