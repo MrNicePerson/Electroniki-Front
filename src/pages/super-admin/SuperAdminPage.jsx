@@ -116,9 +116,11 @@ export default function SuperAdminPage({ user, onLogout }) {
   async function submitShop(event) {
     event.preventDefault(); setSaving(true); setError(''); setNotice('');
     try {
-      const { invoiceTheme, accentColor, invoiceLogo, ...shopDetails } = shopForm;
+      const cleanShopName = shopForm.shopName.trim();
+      if (!cleanShopName) throw new Error('Enter a shop name.');
+      const { invoiceTheme, accentColor, invoiceLogo, ...shopDetails } = { ...shopForm, shopName: cleanShopName };
       await apiRequest('/admin/shops', { method: 'POST', body: { ...shopDetails, invoiceDesign: { theme: invoiceTheme, accentColor, logo: invoiceLogo } } });
-      const createdName = shopForm.shopName;
+      const createdName = cleanShopName;
       setShopForm(emptyShopForm); setModal(''); setNotice(`Created ${createdName}, its owner account, Gemini configuration, and invoice design.`); await loadSummary();
     } catch (err) { setError(err.message || 'Could not create the shop.'); }
     finally { setSaving(false); }
@@ -155,6 +157,15 @@ export default function SuperAdminPage({ user, onLogout }) {
     } catch (err) { setError(err.message || 'Could not update account status.'); }
   }
 
+  async function deleteAccount(account) {
+    if (!window.confirm(`Remove ${account.name} (${account.email}) from ${account.shopName}? Their shop records will remain, but this login will be permanently deleted.`)) return;
+    setError(''); setNotice('');
+    try {
+      await apiRequest(`/admin/users/${account.id}`, { method: 'DELETE' });
+      setNotice(`Removed ${account.name}'s access from ${account.shopName}.`);
+      await loadSummary();
+    } catch (err) { setError(err.message || 'Could not remove account access.'); }
+  }
   const activeUsers = summary.users.filter((account) => account.active).length;
 
   return (
@@ -187,7 +198,7 @@ export default function SuperAdminPage({ user, onLogout }) {
         <div className="platform-admin-table-wrap">
           <table className="platform-admin-table"><thead><tr><th>Account</th><th>Shop</th><th>Access role</th><th>Status</th><th>Last sign in</th><th>Actions</th></tr></thead>
             <tbody>{loading ? <tr><td colSpan="6" className="platform-admin-empty">Loading accounts…</td></tr> : visibleUsers.length ? visibleUsers.map((account) => <tr key={account.id}>
-              <td><b>{account.name}</b><small>{account.email}</small></td><td>{account.shopName}</td><td><span className="platform-admin-role">{account.role === 'overview_viewer' ? 'Overview only' : account.role === 'owner' ? 'Shop owner' : 'Shop account'}</span></td><td><span className={`platform-admin-status ${account.active ? 'active' : 'inactive'}`}>{account.active ? 'Active' : 'Disabled'}</span></td><td>{account.lastLoginAt ? new Date(account.lastLoginAt).toLocaleDateString() : 'Never'}</td><td><div className="platform-admin-row-actions"><button type="button" className="btn ghost small" onClick={() => openEditUser(account)}><KeyRound size={14} /> Edit</button><button type="button" className={`btn small ${account.active ? 'secondary' : ''}`} onClick={() => toggleAccount(account)}>{account.active ? 'Disable' : 'Enable'}</button></div></td>
+              <td><b>{account.name}</b><small>{account.email}</small></td><td>{account.shopName}</td><td><span className="platform-admin-role">{account.role === 'overview_viewer' ? 'Overview only' : account.role === 'owner' ? 'Shop owner' : 'Shop account'}</span></td><td><span className={`platform-admin-status ${account.active ? 'active' : 'inactive'}`}>{account.active ? 'Active' : 'Disabled'}</span></td><td>{account.lastLoginAt ? new Date(account.lastLoginAt).toLocaleDateString() : 'Never'}</td><td><div className="platform-admin-row-actions"><button type="button" className="btn ghost small" onClick={() => openEditUser(account)}><KeyRound size={14} /> Edit</button><button type="button" className={`btn small ${account.active ? 'secondary' : ''}`} onClick={() => toggleAccount(account)}>{account.active ? 'Disable' : 'Enable'}</button><button type="button" className="btn danger small" onClick={() => deleteAccount(account)}>Delete</button></div></td>
             </tr>) : <tr><td colSpan="6" className="platform-admin-empty">No accounts match this search.</td></tr>}</tbody>
           </table>
         </div>
