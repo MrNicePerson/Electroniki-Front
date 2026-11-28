@@ -24,7 +24,7 @@ export default function InstallmentKhataPage({ app }) {
   } = app;
   const query = khataSearch.trim().toLowerCase();
   const queryDigits = query.replace(/\D/g, '');
-  const plans = [...(data.installmentPlans || [])].sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+  const plans = [...(data.installmentPlans || [])].filter((plan) => plan.status !== 'Archived').sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
   const filteredPlans = plans.filter((plan) => {
     const sale = (data.sales || []).find((item) => item.invoiceNo === plan.invoiceNo || item.id === plan.saleId);
     const values = [plan.customerName, plan.phone, plan.whatsapp, plan.cnic, plan.planNo, plan.invoiceNo,
@@ -148,8 +148,8 @@ export default function InstallmentKhataPage({ app }) {
 
   function deletePlan(plan) {
     showAlert(
-      'Delete installment plan?',
-      `${plan.planNo || plan.invoiceNo} can be deleted only if no payment, advance, or product sale is linked to it.`,
+      'Remove installment plan from Khata?',
+      `${plan.planNo || plan.invoiceNo} will be removed from this list. Invoice, payment, and ledger history will be kept.`,
       'danger',
       'Delete plan',
       async () => {
@@ -174,21 +174,21 @@ export default function InstallmentKhataPage({ app }) {
         <section className="card khata-kpi">
           <div className="khata-kpi-label">Active installment plans</div>
           <div className="khata-kpi-value">
-            {data.installmentPlans.filter((item) => num(item.balance) > 0).length}
+            {plans.filter((item) => num(item.balance) > 0).length}
           </div>
           <div className="khata-kpi-foot">Customers currently paying in installments</div>
         </section>
         <section className="card khata-kpi">
           <div className="khata-kpi-label">Total outstanding</div>
           <div className="khata-kpi-value">
-            {money(data.installmentPlans.reduce((sum, item) => sum + num(item.balance), 0))}
+            {money(plans.reduce((sum, item) => sum + num(item.balance), 0))}
           </div>
           <div className="khata-kpi-foot">Remaining balance across active plans</div>
         </section>
         <section className="card khata-kpi">
           <div className="khata-kpi-label">Payments collected</div>
           <div className="khata-kpi-value">
-            {money(data.installmentPlans.reduce((sum, item) => sum + num(item.paid), 0))}
+            {money(plans.reduce((sum, item) => sum + num(item.paid), 0))}
           </div>
           <div className="khata-kpi-foot">Total advance and installment payments</div>
         </section>
