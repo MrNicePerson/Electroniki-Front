@@ -35,6 +35,14 @@ export default function InstallmentKhataPage({ app }) {
     });
   });
 
+  const customerRows = new Map();
+  filteredPlans.forEach((plan) => {
+    const phone = String(plan.whatsapp || plan.phone || '').replace(/\D/g, '');
+    const customerKey = plan.customerId && plan.customerId !== 'walkin' ? `id:${plan.customerId}` : phone ? `phone:${phone}` : `name:${String(plan.customerName || '').trim().toLowerCase()}`;
+    if (!customerRows.has(customerKey)) customerRows.set(customerKey, []);
+    customerRows.get(customerKey).push(plan);
+  });
+  const filteredCustomers = [...customerRows.values()];
   function linkedSale(plan) {
     return (data.sales || []).find((sale) => sale.invoiceNo === plan.invoiceNo || sale.id === plan.saleId) || {};
   }
@@ -191,7 +199,7 @@ export default function InstallmentKhataPage({ app }) {
           <div>
             <h2 style={{ margin: 0, color: '#12303f', fontSize: 16 }}>Installment bills</h2>
             <div className="muted tiny" style={{ marginTop: 4 }}>
-              {filteredPlans.length} bill{filteredPlans.length === 1 ? '' : 's'} · Updated {dateText}
+              {filteredCustomers.length} customer{filteredCustomers.length === 1 ? '' : 's'} · Updated {dateText}
             </div>
           </div>
           <label className="khata-search">
@@ -208,25 +216,30 @@ export default function InstallmentKhataPage({ app }) {
         </div>
 
         {filteredPlans.length === 0 ? (
-          <div className="empty">No installment bills match your search.</div>
+          <div className="empty">No customer accounts match your search.</div>
         ) : (
           <div className="table-wrap khata-table-wrap">
             <table className="data-table khata-table">
               <thead><tr><th>Bill Number</th><th>Pad No.</th><th>Customer</th><th>Details</th><th>Amount</th><th>Received</th><th>Balance</th><th>Next Due</th><th>Actions</th></tr></thead>
-              <tbody>{filteredPlans.map((item) => {
-                const sale = linkedSale(item);
-                return <tr key={item.id}>
-                  <td><strong>{item.invoiceNo || item.planNo || '-'}</strong></td>
-                  <td>{item.padNo || sale.padNo || '—'}</td>
-                  <td><strong>{item.customerName || 'Walk-in customer'}</strong><small className="khata-cell-sub">{item.phone || item.whatsapp || 'No phone'}</small></td>
-                  <td>{item.productSummary || `${item.months || 0} month installment plan`}</td>
-                  <td>{money(item.totalAmount)}</td><td>{money(item.paid)}</td><td><strong>{money(item.balance)}</strong></td>
-                  <td>{item.nextDueDate || '—'}</td>
+              <tbody>{filteredCustomers.map((customerPlans) => {
+                const customer = customerPlans[0];
+                const total = customerPlans.reduce((sum, plan) => sum + num(plan.totalAmount), 0);
+                const paid = customerPlans.reduce((sum, plan) => sum + num(plan.paid), 0);
+                const balance = customerPlans.reduce((sum, plan) => sum + num(plan.balance), 0);
+                const sale = linkedSale(customer);
+                return <tr key={customer.customerId || customer.phone || customer.id}>
+                  <td><strong>{customerPlans.map((plan) => plan.invoiceNo || plan.planNo).join(', ')}</strong></td>
+                  <td>{customerPlans.map((plan) => plan.padNo || linkedSale(plan).padNo).filter(Boolean).join(', ') || '-'}</td>
+                  <td><strong>{customer.customerName || 'Walk-in customer'}</strong><small className="khata-cell-sub">{customer.phone || customer.whatsapp || 'No phone'}</small></td>
+                  <td>{customerPlans.map((plan) => plan.productSummary || `${plan.months || 0} month plan`).join('; ')}</td>
+                  <td>{money(total)}</td><td>{money(paid)}</td><td><strong>{money(balance)}</strong></td>
+                  <td>{customerPlans.map((plan) => plan.nextDueDate).filter(Boolean).sort()[0] || '-'}</td>
                   <td><div className="khata-row-actions">
-                    <button type="button" className="btn ghost small" onClick={() => setSelectedPlan(item)}><Eye size={14} /> Details</button>
-                    {num(item.balance) > 0 && <button type="button" className="btn small" onClick={() => openPayment(item)}><Banknote size={14} /> Receive</button>}
-                    <button type="button" className="btn ghost small" onClick={() => beginEdit(item)}><Pencil size={14} /> Edit</button>
-                    <button type="button" className="btn danger small" onClick={() => deletePlan(item)}>Delete</button>
+                    {customerPlans.map((plan) => <React.Fragment key={plan.id}>
+                      <button type="button" className="btn ghost small" onClick={() => setSelectedPlan(plan)}><Eye size={14} /> Details</button>
+                      {num(plan.balance) > 0 && <button type="button" className="btn small" onClick={() => openPayment(plan)}><Banknote size={14} /> Receive</button>}
+                      <button type="button" className="btn ghost small" onClick={() => beginEdit(plan)}><Pencil size={14} /> Edit</button>
+                    </React.Fragment>)}
                   </div></td>
                 </tr>;
               })}</tbody>
