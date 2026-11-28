@@ -18,6 +18,15 @@ import { apiRequest, money, num } from '../../api.js';
 
 export default function NewSalePage({ app }) {
   const { data, page, cart, setCart, setResumedHeldOrderId, customerId, setCustomerId, saleCustomerName, setSaleCustomerName, salePhone, setSalePhone, saleCnic, setSaleCnic, saleAddress, setSaleAddress, salePadNo, setSalePadNo, customerInfo, setCustomerInfo, billDiscount, setBillDiscount, saleType, setSaleType, plan, setPlan, salePayment, setSalePayment, productSearch, setProductSearch, setSelectedSearchProductId, newQty, setNewQty, newPrice, setNewPrice, showSuggestions, setShowSuggestions, savingSale, setShowInstallmentCustomerModal, setShowNewCustomerModal, setEditingCustomerRecord, showAlert, gross, appliedDiscount, discounted, add, finalTotal, resetSaleAmounts, cashRec, advanceOrPaid, remainingBalance, excessPayment, monthlyInstallment, handleAddItemToCart, updateCartItemField, handleHoldBill, handleSaveSale, dateText, matchingSearchProducts, editingInvoice, cancelInvoiceEdit } = app;
+  const customerQuery = saleCustomerName.trim().toLowerCase();
+  const customerMatches = customerQuery
+    ? (data.customers || []).filter((customer) => [customer.name, customer.phone, customer.whatsapp, customer.cnic]
+      .some((value) => String(value || '').toLowerCase().includes(customerQuery))).slice(0, 8)
+    : [];
+  function selectCustomer(customer) {
+    setCustomerId(customer.id); setSaleCustomerName(customer.name || ''); setCustomerInfo(null);
+    setSalePhone(customer.phone || ''); setSaleCnic(customer.cnic || ''); setSaleAddress(customer.address || '');
+  }
   return (
               <>
                 <div className="page-head">
@@ -37,88 +46,14 @@ export default function NewSalePage({ app }) {
                       <div className="fields">
                         <label className="field full">
                           Customer name
-                          <input
-                            id="saleCustomerName"
-                            value={saleCustomerName}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              setSaleCustomerName(value);
-                              const found = data.customers.find((customer) => customer.name.trim().toLowerCase() === value.trim().toLowerCase());
-                              if (found) {
-                                setCustomerId(found.id);
-                                setCustomerInfo(null);
-                                setSalePhone(found.phone || '');
-                                setSaleCnic(found.cnic || '');
-                                setSaleAddress(found.address || '');
-                              } else {
-                                if (customerId !== 'walkin') {
-                                  setSalePhone('');
-                                  setSaleCnic('');
-                                  setSaleAddress('');
-                                }
-                                setCustomerId('walkin');
-                                setCustomerInfo((current) => current ? { ...current, name: value } : null);
-                              }
-                            }}
-                            placeholder="Type customer name"
-                          />
-                          <small className="muted">Type a new name or choose a saved customer below.</small>
-                        </label>
-                        <label className="field full">
-                          Select saved customer (optional)
-                          <select
-                            id="customerSelect"
-                            value={customerId}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              if (val === 'new') {
-                                setEditingCustomerRecord(null);
-                                setShowNewCustomerModal(true);
-                                return;
-                              }
-                              setCustomerId(val);
-                              setSaleCustomerName(val === 'walkin' ? 'Walk-in customer' : data.customers.find((c) => c.id === val)?.name || 'Walk-in customer');
-                              setCustomerInfo(null);
-                              if (val === 'walkin') {
-                                setSalePhone('');
-                                setSaleCnic('');
-                                setSaleAddress('');
-                              } else {
-                                const found = data.customers.find((c) => c.id === val);
-                                if (found) {
-                                  setSalePhone(found.phone || '');
-                                  setSaleCnic(found.cnic || '');
-                                  setSaleAddress(found.address || '');
-                                }
-                              }
-                            }}
-                          >
-                            <option value="walkin">Walk-in customer</option>
-                            {data.customers.map((cu) => (
-                              <option key={cu.id} value={cu.id}>
-                                {cu.name} · {cu.phone}
-                              </option>
-                            ))}
-                            <option value="new">+ Add new customer</option>
-                          </select>
-                        </label>
-                        <label className="field">
-                          Customer phone
-                          <input
-                            id="salePhone"
-                            value={salePhone}
-                            onChange={(e) => setSalePhone(e.target.value)}
-                            placeholder="03XX XXXXXXX"
-                          />
-                        </label>
-                        <label className="field">
-                          Customer ID / CNIC
-                          <input
-                            id="saleCnic"
-                            value={saleCnic}
-                            onChange={(e) => setSaleCnic(e.target.value)}
-                            placeholder="XXXXX-XXXXXXX-X"
-                          />
+                          <input id="saleCustomerName" value={saleCustomerName === 'Walk-in customer' ? '' : saleCustomerName} autoComplete="off" role="combobox" aria-autocomplete="list" aria-expanded={customerMatches.length > 0} aria-controls="sale-customer-suggestions" onChange={(event) => {
+                            const value = event.target.value; setSaleCustomerName(value);
+                            const found = data.customers.find((customer) => customer.name.trim().toLowerCase() === value.trim().toLowerCase());
+                            if (found) selectCustomer(found);
+                            else { if (customerId !== 'walkin') { setSalePhone(''); setSaleCnic(''); setSaleAddress(''); } setCustomerId('walkin'); setCustomerInfo((current) => current ? { ...current, name: value } : null); }
+                          }} onKeyDown={(event) => { if (event.key === 'Escape') event.currentTarget.blur(); if (event.key === 'Enter' && customerMatches.length) { event.preventDefault(); selectCustomer(customerMatches[0]); } }} placeholder="Type customer name or phone" />
+                          {customerMatches.length > 0 && <div id="sale-customer-suggestions" className="customer-suggestions" role="listbox">{customerMatches.map((customer) => <button type="button" role="option" aria-selected={customer.id === customerId} key={customer.id} onClick={() => selectCustomer(customer)}><strong>{customer.name}</strong><small>{[customer.phone, customer.cnic].filter(Boolean).join(' · ') || 'Saved customer'}</small></button>)}</div>}
+                          <small className="muted">{customerId !== 'walkin' ? 'Saved customer selected. Contact details are filled below.' : 'Type a name or phone to find a saved customer, or enter a new name.'}</small>
                         </label>
                         <label className="field full">
                           Address
