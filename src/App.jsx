@@ -689,8 +689,17 @@ export default function App() {
       const wasEditing = Boolean(editingInvoice);
       setEditingInvoice(null);
       setCart([]);
+      setCustomerId('walkin');
+      setSaleCustomerName('Walk-in customer');
+      setCustomerInfo(null);
+      setSalePhone('');
+      setSaleCnic('');
+      setSaleAddress('');
       setResumedHeldOrderId('');
       setSalePadNo('');
+      setSaleType('cash');
+      setPlan({ months: 12, advance: 15000, percent: 10 });
+      setSalePayment({ method: 'cash', cash: '0', bank: '0', bankName: '', bankAccount: '' });
       resetSaleAmounts();
       notify(wasEditing ? `Invoice ${res.sale.invoiceNo} updated.` : `Sale ${res.sale.invoiceNo} saved!`);
       try {
